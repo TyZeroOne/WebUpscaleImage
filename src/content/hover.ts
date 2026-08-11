@@ -1,4 +1,6 @@
 import type { OverlayButton } from '@/ui/overlay-button'
+import type { VideoBadge } from '@/ui/video-badge'
+import { MIN_VIDEO_SIDE_PX, videoBadgeMode } from '@/video'
 import { isEnhanceableImage } from './detect'
 
 /**
@@ -28,11 +30,23 @@ import { isEnhanceableImage } from './detect'
  * СПИСОК картинок для очереди, а не одна текущая. Это другая задача.
  */
 
+/**
+ * Что сейчас под курсором.
+ *
+ * До этапа 8 отслеживались только картинки. Видео добавлено как точка
+ * расширения: механика наведения, позиционирования и пересчёта при прокрутке
+ * у них общая, различается только показываемый элемент.
+ */
+export type MediaTarget =
+  | { kind: 'image'; element: HTMLImageElement }
+  | { kind: 'video'; element: HTMLVideoElement }
+
 export interface HoverTrackerOptions {
   button: OverlayButton
-  /** Элемент-хозяин shadow root: наведение на него не считается уходом с картинки. */
+  badge: VideoBadge
+  /** Элемент-хозяин shadow root: наведение на него не считается уходом с медиа. */
   host: HTMLElement
-  onChange: (image: HTMLImageElement | null) => void
+  onChange: (target: MediaTarget | null) => void
 }
 
 /**
@@ -45,28 +59,57 @@ export interface HoverTrackerOptions {
 const HIT_TEST_DEPTH = 5
 
 export function createHoverTracker(options: HoverTrackerOptions): { destroy: () => void } {
-  const { button, host, onChange } = options
+  const { button, badge, host, onChange } = options
+  const badgeMode = videoBadgeMode()
 
-  let current: HTMLImageElement | null = null
+  let current: MediaTarget | null = null
   let frame = 0
 
-  const setCurrent = (image: HTMLImageElement | null): void => {
-    if (image === current) return
-    current = image
-    onChange(image)
-    if (image) button.showFor(image.getBoundingClientRect())
-    else button.hide()
+  const hideAll = (): void => {
+    button.hide()
+    badge.hide()
+  }
+
+  const showFor = (target: MediaTarget): void => {
+    const rect = target.element.getBoundingClientRect()
+    if (target.kind === 'image') {
+      badge.hide()
+      button.showFor(rect)
+      return
+    }
+    button.hide()
+    badge.showFor(rect)
+  }
+
+  const setCurrent = (target: MediaTarget | null): void => {
+    if (target?.element === current?.element) return
+    current = target
+    onChange(target)
+    if (target) showFor(target)
+    else hideAll()
+  }
+
+  /** Годится ли видео для показа плашки. */
+  const isTrackableVideo = (video: HTMLVideoElement): boolean => {
+    if (badgeMode === 'hidden') return false
+    // videoWidth === 0 — метаданные ещё не загрузились, размеров нет.
+    if (video.videoWidth === 0) return false
+    const rect = video.getBoundingClientRect()
+    return rect.width >= MIN_VIDEO_SIDE_PX && rect.height >= MIN_VIDEO_SIDE_PX
   }
 
   /**
-   * Ищем картинку под точкой, а не смотрим на event.target.
+   * Ищем медиа под точкой, а не смотрим на event.target.
    *
    * event.target даёт самый верхний элемент, который принял событие.
    * Если картинка накрыта прозрачным <a> или <div> (типовой приём в
    * галереях и лентах), target будет этим слоем, а не <img>, и кнопка
    * просто не появится. Хит-тест по координатам решает это.
+   *
+   * Для видео это тем более важно: плееры почти всегда накрывают видео
+   * слоем с элементами управления, и <video> не бывает верхним элементом.
    */
-  const imageAtPoint = (x: number, y: number): HTMLImageElement | null | 'own-ui' => {
+  const mediaAtPoint = (x: number, y: number): MediaTarget | null | 'own-ui' => {
     const stack = document.elementsFromPoint(x, y)
     for (let i = 0; i < Math.min(stack.length, HIT_TEST_DEPTH); i++) {
       const element = stack[i]
@@ -75,15 +118,18 @@ export function createHoverTracker(options: HoverTrackerOptions): { destroy: () 
       // возвращает host-элемент, а не то, что внутри него.
       if (element === host) return 'own-ui'
       if (element instanceof HTMLImageElement) {
-        return isEnhanceableImage(element) ? element : null
+        return isEnhanceableImage(element) ? { kind: 'image', element } : null
+      }
+      if (element instanceof HTMLVideoElement) {
+        return isTrackableVideo(element) ? { kind: 'video', element } : null
       }
     }
     return null
   }
 
   const handlePointer = (event: MouseEvent): void => {
-    const found = imageAtPoint(event.clientX, event.clientY)
-    // Курсор перешёл на нашу кнопку — текущую картинку не сбрасываем,
+    const found = mediaAtPoint(event.clientX, event.clientY)
+    // Курсор перешёл на нашу кнопку — текущий элемент не сбрасываем,
     // иначе кнопка исчезала бы ровно в момент попытки на неё нажать.
     if (found === 'own-ui') return
     setCurrent(found)
@@ -104,19 +150,19 @@ export function createHoverTracker(options: HoverTrackerOptions): { destroy: () 
     frame = requestAnimationFrame(() => {
       frame = 0
       if (!current) return
-      // Картинку могли удалить из DOM во время прокрутки (виртуальные списки).
-      if (!current.isConnected) {
+      // Элемент могли удалить из DOM во время прокрутки (виртуальные списки).
+      if (!current.element.isConnected) {
         setCurrent(null)
         return
       }
-      const rect = current.getBoundingClientRect()
-      // Ушла за пределы окна — прячем кнопку, чтобы она не висела над
-      // посторонним содержимым.
+      const rect = current.element.getBoundingClientRect()
+      // Ушёл за пределы окна — прячем, чтобы не висело над посторонним
+      // содержимым.
       if (rect.bottom <= 0 || rect.top >= window.innerHeight) {
         setCurrent(null)
         return
       }
-      button.showFor(rect)
+      showFor(current)
     })
   }
 

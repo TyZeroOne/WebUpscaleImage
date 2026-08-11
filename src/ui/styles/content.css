@@ -75,6 +75,47 @@
   display: none;
 }
 
+/* --------------------------------------------------------- плашка над видео */
+
+.badge {
+  position: fixed;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border-radius: 999px;
+  background: rgba(20, 22, 28, 0.72);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.7);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  /* Отключённая плашка не перехватывает клики: иначе она украла бы
+     у пользователя управление плеером. */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.badge[data-visible='true'] {
+  opacity: 1;
+}
+
+.badge[data-interactive='true'] {
+  background: rgba(20, 22, 28, 0.82);
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.badge svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
 /* ------------------------------------------------ подсветка целевой картинки */
 
 .highlight {

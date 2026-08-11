@@ -5,7 +5,8 @@ import { createHighlight } from '@/ui/highlight'
 import { createOverlayButton } from '@/ui/overlay-button'
 import { createProgressPanel } from '@/ui/progress-panel'
 import { createToaster } from '@/ui/toast'
-import { VIDEO_ENHANCEMENT_ENABLED } from '@/video'
+import { createVideoBadge } from '@/ui/video-badge'
+import { VIDEO_ENHANCEMENT_ENABLED, videoBadgeMode } from '@/video'
 import { findImageBySource, scanMedia } from './detect'
 import { createEnhanceFlow } from './enhance-flow'
 import { createHoverTracker } from './hover'
@@ -35,14 +36,21 @@ function bootstrapUi(): void {
   const toaster = createToaster(layer)
   const highlight = createHighlight(layer)
   const panel = createProgressPanel(layer)
+  const badge = createVideoBadge(layer, videoBadgeMode() === 'interactive')
 
   let hovered: HTMLImageElement | null = null
 
   createHoverTracker({
     button,
+    badge,
     host,
-    onChange: (image) => {
-      hovered = image
+    onChange: (target) => {
+      /**
+       * Точка расширения под видео. Сейчас плашка над <video> только
+       * показывается; когда появится обработка, здесь будет запоминаться
+       * элемент, как это уже делается для картинок.
+       */
+      hovered = target?.kind === 'image' ? target.element : null
     },
   })
 
