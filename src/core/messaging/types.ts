@@ -62,6 +62,24 @@ export interface MessageContracts {
   }
 
   /**
+   * Загрузка картинки силами расширения, в обход CORS.
+   *
+   * Content script не может обойти CORS: его запросы подчиняются правилам
+   * страницы. Service worker с host_permissions — может, его запросы
+   * CORS не ограничивает.
+   *
+   * Ответ приходит строкой data: URL, а не двоичными данными: канал
+   * сообщений сериализует всё в JSON, и ни Blob, ни ArrayBuffer через него
+   * не проходят.
+   */
+  FETCH_IMAGE: {
+    request: { url: string }
+    response:
+      | { ok: true; dataUrl: string; bytes: number }
+      | { ok: false; reason: 'network' | 'too-large' | 'not-image' | 'unsupported-scheme' }
+  }
+
+  /**
    * Запуск режима «вся страница». Приходит из popup или из контекстного меню.
    *
    * Ответ возвращается СРАЗУ, до окончания работы: очередь может выполняться

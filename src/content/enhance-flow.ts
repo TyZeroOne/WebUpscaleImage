@@ -65,6 +65,17 @@ export class AlreadyRunningError extends Error {
   }
 }
 
+/**
+ * Причина неудачи человеческим языком.
+ *
+ * Правило для всех формулировок: сообщение должно отвечать на вопрос
+ * «что теперь делать», а не «что сломалось». «SecurityError» и
+ * «Не удалось обработать» одинаково бесполезны — из них не следует
+ * ни одного действия.
+ *
+ * Где действие невозможно в принципе (векторная картинка), сообщение
+ * объясняет, почему обработка не нужна, а не притворяется ошибкой.
+ */
 export function describeFailure(error: unknown): string {
   if (error instanceof AlreadyRunningError) return 'Эта картинка уже обрабатывается.'
   if (error instanceof ImageSourceError) {
@@ -72,9 +83,13 @@ export function describeFailure(error: unknown): string {
       case 'not-loaded':
         return 'Картинка ещё не загрузилась. Попробуйте ещё раз.'
       case 'tainted':
-        return 'Сайт не разрешает читать эту картинку. Обход появится на этапе 7.'
+        return 'Сайт закрыл доступ к этой картинке, и загрузить её напрямую тоже не вышло.'
       case 'decode-failed':
-        return 'Не удалось прочитать эту картинку.'
+        return 'Не удалось прочитать эту картинку — возможно, файл повреждён.'
+      case 'unsupported-format':
+        return 'Это векторная картинка: она и так рисуется чётко в любом размере.'
+      case 'too-large':
+        return 'Картинка слишком большая — обработка не поместится в память.'
     }
   }
   if (error instanceof DOMException && error.name === 'AbortError') {
@@ -82,7 +97,7 @@ export function describeFailure(error: unknown): string {
   }
   if (error instanceof RangeError) {
     // Типичный случай: не хватило памяти на буферы для очень большой картинки.
-    return 'Картинка слишком большая для обработки.'
+    return 'Не хватило памяти. Попробуйте уровень «быстро» в настройках.'
   }
   return 'Не удалось обработать картинку.'
 }

@@ -3,6 +3,7 @@ import { registerMessageHandlers } from '@/core/messaging'
 import { getSettings, onSettingsChanged } from '@/core/settings'
 import { registerContextMenu } from './context-menu'
 import { startDevReloadWatcher } from './dev-reload'
+import { fetchImageAsDataUrl } from './image-fetch'
 
 /**
  * Service worker расширения — единственная «всегда доступная» точка,
@@ -50,6 +51,13 @@ registerMessageHandlers({
     )
     return { received: true }
   },
+
+  /**
+   * Последний рубеж для картинок, закрытых CORS. Работает здесь, а не
+   * в content script, потому что запросы service worker'а расширения
+   * правилам CORS не подчиняются.
+   */
+  FETCH_IMAGE: (payload) => fetchImageAsDataUrl(payload),
 })
 
 registerContextMenu()

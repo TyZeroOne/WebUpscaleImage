@@ -1,4 +1,5 @@
 import { createLogger } from '@/core/log'
+import { sendToBackground } from '@/core/messaging'
 
 /**
  * Получение пикселей картинки со страницы.
@@ -18,22 +19,14 @@ import { createLogger } from '@/core/log'
  * canvas и прочитать содержимое — браузер-то отправит запрос с куками
  * пользователя и получит его личную страницу.
  *
- * Для нас это значит: улучшить картинку мало, к её пикселям надо ещё
- * получить доступ. И большинство картинок в интернете — с CDN, то есть
- * с чужого домена.
+ * ТРИ ПОПЫТКИ, ОТ ДЕШЁВОЙ К ДОРОГОЙ
  *
- * ЧТО С ЭТИМ МОЖНО СДЕЛАТЬ
- *
- * 1. Загрузить картинку заново с атрибутом crossOrigin="anonymous".
- *    Тогда браузер отправит запрос БЕЗ кук и проверит заголовок
- *    Access-Control-Allow-Origin в ответе. Если сервер его прислал —
- *    canvas остаётся чистым. Большинство CDN присылают (`*`), поэтому
- *    способ покрывает изрядную долю случаев. Это и делает данный модуль.
- *
- * 2. Скачать картинку из service worker'а с разрешением host_permissions.
- *    Запросы расширения из фонового контекста не подчиняются CORS вовсе,
- *    поэтому способ работает всегда. Цена — пугающее разрешение «доступ
- *    ко всем сайтам» при установке. Это решение этапа 7.
+ * 1. Использовать уже загруженную картинку. Сети нет вообще. Работает для
+ *    своего домена и для всего, что уже пришло с CORS-заголовками.
+ * 2. Перезагрузить с crossOrigin="anonymous". Браузер отправит запрос без кук
+ *    и проверит Access-Control-Allow-Origin в ответе. Работает на большинстве CDN.
+ * 3. Попросить service worker. Его запросы CORS не ограничивает вовсе —
+ *    это последний рубеж, добавленный на этапе 7. Требует host_permissions.
  */
 
 const log = createLogger('image-source')
@@ -42,6 +35,8 @@ export type ImageSourceFailure =
   | 'not-loaded'
   | 'tainted'
   | 'decode-failed'
+  | 'unsupported-format'
+  | 'too-large'
 
 export class ImageSourceError extends Error {
   constructor(
@@ -62,6 +57,31 @@ export class ImageSourceError extends Error {
  * держать пользователя в неведении.
  */
 const CORS_RELOAD_TIMEOUT_MS = 10_000
+
+/**
+ * Потолок размера исходной картинки в пикселях.
+ *
+ * Проверяется ДО начала работы, чтобы отказать понятным сообщением, а не
+ * нехваткой памяти где-то в середине фильтра. 40 Мп — это, например,
+ * 8000×5000: заметно больше, чем даёт любая потребительская камера
+ * в вебе, и уже за пределами потолка результата (24 Мп).
+ */
+const MAX_SOURCE_PIXELS = 40_000_000
+
+/**
+ * SVG — векторная графика.
+ *
+ * Увеличивать её бессмысленно: браузер и так рисует её без потерь в любом
+ * размере. Растеризовать в двукратный PNG значит превратить масштабируемую
+ * картинку в немасштабируемую — то есть ухудшить.
+ *
+ * Определяется по расширению и по data:-схеме. Способ неточный (сервер мог
+ * отдать SVG по адресу без расширения), но дешёвый и покрывает практически
+ * все случаи; ошибка в другую сторону безобидна — картинка просто обработается.
+ */
+export function isVectorImage(url: string): boolean {
+  return /^data:image\/svg\+xml/i.test(url) || /\.svgz?($|[?#])/i.test(url)
+}
 
 /**
  * Проверка, читаются ли пиксели.
@@ -121,11 +141,34 @@ function loadWithCors(url: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Возвращает ImageBitmap, из которого гарантированно можно читать пиксели.
+ * Третья попытка: загрузка силами расширения.
  *
- * Порядок попыток выстроен от дешёвого к дорогому: сначала используем уже
- * загруженную картинку (сети нет вообще), и только если её пиксели закрыты —
- * идём в сеть за CORS-копией.
+ * Возвращает null, если и это не помогло, — вызывающая сторона тогда
+ * сообщит пользователю понятную причину.
+ */
+async function loadViaBackground(url: string): Promise<ImageBitmap | null> {
+  const response = await sendToBackground('FETCH_IMAGE', { url })
+  if (!response) {
+    log.warn('Service worker не ответил на запрос загрузки')
+    return null
+  }
+  if (!response.ok) {
+    log.warn(`Расширение не смогло загрузить картинку: ${response.reason}`)
+    return null
+  }
+
+  /**
+   * data: URL никогда не портит canvas: данные пришли не из сети, а из
+   * самой строки, и «чужого источника» у них нет. Поэтому bitmap,
+   * созданный отсюда, гарантированно читается.
+   */
+  const blob = await (await fetch(response.dataUrl)).blob()
+  log.debug(`Картинка получена через расширение: ${Math.round(response.bytes / 1024)} КБ`)
+  return createImageBitmap(blob)
+}
+
+/**
+ * Возвращает ImageBitmap, из которого гарантированно можно читать пиксели.
  */
 export async function acquireReadableBitmap(image: HTMLImageElement): Promise<ImageBitmap> {
   if (!image.complete || image.naturalWidth === 0) {
@@ -133,6 +176,13 @@ export async function acquireReadableBitmap(image: HTMLImageElement): Promise<Im
   }
 
   const url = image.currentSrc || image.src
+
+  if (isVectorImage(url)) {
+    throw new ImageSourceError('unsupported-format', 'Векторная картинка')
+  }
+  if (image.naturalWidth * image.naturalHeight > MAX_SOURCE_PIXELS) {
+    throw new ImageSourceError('too-large', 'Картинка слишком большая')
+  }
 
   let bitmap: ImageBitmap
   try {
@@ -148,16 +198,19 @@ export async function acquireReadableBitmap(image: HTMLImageElement): Promise<Im
   // Первый bitmap больше не нужен: он держит копию пикселей в памяти.
   bitmap.close()
 
-  const corsImage = await loadWithCors(url)
-  const corsBitmap = await createImageBitmap(corsImage)
-
-  if (!isReadable(corsBitmap)) {
-    // Такое случается: сервер прислал заголовок, но не тот. Проверка
-    // остаётся, потому что альтернатива — SecurityError глубоко внутри
-    // апскейлера, где непонятно, что произошло.
+  try {
+    const corsImage = await loadWithCors(url)
+    const corsBitmap = await createImageBitmap(corsImage)
+    if (isReadable(corsBitmap)) return corsBitmap
+    // Такое случается: сервер прислал заголовок, но не тот.
     corsBitmap.close()
-    throw new ImageSourceError('tainted', 'Сервер не разрешает чтение картинки')
+  } catch (error) {
+    log.debug('Повторная загрузка с CORS не удалась:', error)
   }
 
-  return corsBitmap
+  log.debug('Пробую загрузить картинку силами расширения')
+  const viaBackground = await loadViaBackground(url)
+  if (viaBackground) return viaBackground
+
+  throw new ImageSourceError('tainted', 'Не удалось получить доступ к пикселям картинки')
 }

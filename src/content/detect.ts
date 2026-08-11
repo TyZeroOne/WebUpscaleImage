@@ -1,3 +1,5 @@
+import { isVectorImage } from './image-source'
+
 /**
  * Поиск медиа-элементов на странице.
  *
@@ -27,6 +29,18 @@ export function isEnhanceableImage(img: HTMLImageElement): boolean {
   const rect = img.getBoundingClientRect()
   // Нулевой размер = display:none, спейсер или трекинг-пиксель.
   if (rect.width < MIN_SIDE_PX || rect.height < MIN_SIDE_PX) return false
+
+  /**
+   * Векторную графику отсеиваем на уровне детекции, а не при обработке.
+   *
+   * Кнопка «улучшить» над иконкой, которая и так идеально чёткая в любом
+   * размере, — обещание, которое расширение не может выполнить. Лучше
+   * её не показывать вовсе, чем показывать и объяснять отказ.
+   *
+   * При явном запросе (контекстное меню) объяснение всё равно появится:
+   * там Chrome решает, что показать в меню, а не мы.
+   */
+  if (isVectorImage(img.currentSrc || img.src)) return false
 
   return true
 }

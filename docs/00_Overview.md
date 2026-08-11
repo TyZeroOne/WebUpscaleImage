@@ -138,8 +138,8 @@ image-enhancer/
 | 4 | Вынос вычислений в Web Worker | [05_Stage4_Worker_Impl.md](05_Stage4_Worker_Impl.md) | [05_Stage4_Worker_Guide.md](05_Stage4_Worker_Guide.md) | ✅ готов |
 | 5 | ML-апскейл | [06_Stage5_MlUpscale_Impl.md](06_Stage5_MlUpscale_Impl.md) | [06_Stage5_MlUpscale_Guide.md](06_Stage5_MlUpscale_Guide.md) | ✅ готов |
 | 6 | Уровни качества и настройки | [07_Stage6_Settings_Impl.md](07_Stage6_Settings_Impl.md) | [07_Stage6_Settings_Guide.md](07_Stage6_Settings_Guide.md) | ✅ готов |
-| 7 | Устойчивость: CORS и ошибки | — | — | следующий |
-| 8 | Заглушка видео-архитектуры | — | — | |
+| 7 | Устойчивость: CORS и ошибки | [08_Stage7_Resilience_Impl.md](08_Stage7_Resilience_Impl.md) | [08_Stage7_Resilience_Guide.md](08_Stage7_Resilience_Guide.md) | ✅ готов |
+| 8 | Заглушка видео-архитектуры | — | — | следующий |
 | 9 | Полировка и упаковка | — | — | |
 
 ## Разрешения расширения: что уже есть и что появится
@@ -152,7 +152,7 @@ image-enhancer/
 | `content_scripts` на `http(s)://*/*` | ✅ этап 0 | Оверлеи при наведении невозможны без постоянного присутствия на странице |
 | `contextMenus` | ✅ этап 1 | Пункт «Улучшить изображение» по правому клику |
 | `offscreen` | **не понадобилось на этапе 4** | Планировалось как контекст для Worker'ов, но пиксели туда не доставить: канал между content script и service worker сериализует сообщения в JSON. Воркер создаётся прямо из content script через blob-URL. Вероятно, понадобится на этапе 7 |
-| `host_permissions` | этап 7 | Загрузка картинки в обход CORS, когда canvas «испорчен» (tainted). На этапе 2 частично решено повторной загрузкой с `crossOrigin` — работает, если сервер отдаёт `Access-Control-Allow-Origin` |
+| `host_permissions` | ✅ этап 7 | Загрузка картинки в обход CORS, когда canvas «испорчен» (tainted). Не добавляет нового предупреждения при установке: оно уже вызвано `content_scripts` |
 | `downloads` | **не понадобилось** | Скачивание сделано ссылкой `<a download>`; API расширения потребовало бы отдельного предупреждения при установке |
 | `web_accessible_resources` | ✅ этап 5 | `ml-worker.js`, модель и `.wasm` должны быть доступны странице: воркер создаётся из blob-URL с её источником |
 | CSP `wasm-unsafe-eval` | ✅ этап 5 | По умолчанию CSP расширений запрещает компиляцию WebAssembly |
