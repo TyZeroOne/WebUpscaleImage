@@ -1,5 +1,8 @@
 node_modules/
 dist/
+# Копируются из node_modules скриптом scripts/copy-assets.mjs при каждой сборке.
+public/models/
+public/wasm/
 *.zip
 *.log
 .DS_Store

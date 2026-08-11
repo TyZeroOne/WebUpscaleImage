@@ -25,7 +25,7 @@ const buildIdFile = fileURLToPath(new URL('dev-build-id', distUrl))
 const watch = process.argv.includes('--watch')
 const mode = watch ? 'development' : 'production'
 
-const CONFIGS = ['vite.config.ts', 'vite.content.config.ts']
+const CONFIGS = ['vite.config.ts', 'vite.content.config.ts', 'vite.mlworker.config.ts']
 
 /**
  * ВАЖНО: значение import.meta.env.DEV Vite берёт из NODE_ENV, а НЕ из mode.
@@ -42,6 +42,10 @@ process.env.NODE_ENV = mode
 const { build } = await import('vite')
 
 await rm(distUrl, { recursive: true, force: true })
+
+// Модель и .wasm-бинарники копируются из node_modules в public/ до сборки:
+// оттуда Vite положит их в dist как есть.
+await import('./copy-assets.mjs')
 
 if (!watch) {
   // Последовательно: обе сборки пишут в один dist, параллельный запуск

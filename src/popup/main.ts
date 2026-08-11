@@ -25,9 +25,14 @@ function setText(id: string, text: string, state?: 'ok' | 'fail'): void {
   node.className = state ? `ie-${state}` : ''
 }
 
-function renderCapabilities(): void {
-  const caps = detectCapabilities()
-  setText('webgpu', caps.webgpuApiPresent ? 'есть' : 'нет', caps.webgpuApiPresent ? 'ok' : 'fail')
+async function renderCapabilities(): Promise<void> {
+  const caps = await detectCapabilities()
+  setText(
+    'webgpu',
+    caps.webgpu ? (caps.webgpuAdapter ?? 'есть') : 'нет',
+    caps.webgpu ? 'ok' : 'fail',
+  )
+  setText('wasm-simd', caps.wasmSimd ? 'есть' : 'нет', caps.wasmSimd ? 'ok' : 'fail')
   setText('offscreen', caps.offscreenCanvas ? 'есть' : 'нет', caps.offscreenCanvas ? 'ok' : 'fail')
   setText('bitmap', caps.imageBitmap ? 'есть' : 'нет', caps.imageBitmap ? 'ok' : 'fail')
   setText('cores', String(caps.logicalCores))
@@ -95,7 +100,7 @@ async function startPageEnhance(): Promise<void> {
 }
 
 setText('version', `v${chrome.runtime.getManifest().version}`)
-renderCapabilities()
+void renderCapabilities().catch((error: unknown) => log.error('Детекция устройства:', error))
 void pingBackground().catch((error: unknown) => log.error('PING не прошёл:', error))
 void scanActiveTab().catch((error: unknown) => log.error('Опрос вкладки не прошёл:', error))
 

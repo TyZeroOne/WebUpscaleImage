@@ -16,8 +16,12 @@
 - **Язык:** TypeScript 7 (нативный компилятор, используется только для проверки типов)
 - **Сборка:** Vite 8 (бандлер под капотом — Rolldown)
 - **Обработка изображений:**
-  - базовый уровень — Canvas 2D API, классическая интерполяция (bicubic/Lanczos)
-  - продвинутый уровень — ONNX Runtime Web, WebGPU с фоллбеком на WASM SIMD, лёгкая SR-модель
+  - базовый уровень — Canvas 2D API, фильтр Ланцоша собственной реализации
+  - продвинутый уровень — TensorFlow.js 4.22, WebGPU с фоллбеком на WASM SIMD,
+    модель ESRGAN-slim x2 (`@upscalerjs/esrgan-slim`, MIT, RDN-архитектура)
+  - *выбор рантайма:* взят TensorFlow.js, а не ONNX Runtime Web — готовой SR-модели
+    в формате ONNX в npm не нашлось, а к TF.js есть обученная модель, ставящаяся
+    обычным `npm install`
 - **Исполнение тяжёлых вычислений:** Web Worker внутри Offscreen Document
 - **Хранение настроек:** `chrome.storage.sync`
 - **Зависимостей в рантайме на этап 0:** ноль. Всё, что попадает в пакет расширения, написано в проекте.
@@ -132,8 +136,8 @@ image-enhancer/
 | 2 | Классический апскейл, режим «одно изображение» | [03_Stage2_ClassicUpscale_Impl.md](03_Stage2_ClassicUpscale_Impl.md) | [03_Stage2_ClassicUpscale_Guide.md](03_Stage2_ClassicUpscale_Guide.md) | ✅ готов |
 | 3 | Режим «вся страница» | [04_Stage3_PageMode_Impl.md](04_Stage3_PageMode_Impl.md) | [04_Stage3_PageMode_Guide.md](04_Stage3_PageMode_Guide.md) | ✅ готов |
 | 4 | Вынос вычислений в Web Worker | [05_Stage4_Worker_Impl.md](05_Stage4_Worker_Impl.md) | [05_Stage4_Worker_Guide.md](05_Stage4_Worker_Guide.md) | ✅ готов |
-| 5 | ML-апскейл | — | — | следующий |
-| 6 | Уровни качества и настройки | — | — | |
+| 5 | ML-апскейл | [06_Stage5_MlUpscale_Impl.md](06_Stage5_MlUpscale_Impl.md) | [06_Stage5_MlUpscale_Guide.md](06_Stage5_MlUpscale_Guide.md) | ✅ готов |
+| 6 | Уровни качества и настройки | — | — | следующий |
 | 7 | Устойчивость: CORS и ошибки | — | — | |
 | 8 | Заглушка видео-архитектуры | — | — | |
 | 9 | Полировка и упаковка | — | — | |
@@ -150,6 +154,8 @@ image-enhancer/
 | `offscreen` | **не понадобилось на этапе 4** | Планировалось как контекст для Worker'ов, но пиксели туда не доставить: канал между content script и service worker сериализует сообщения в JSON. Воркер создаётся прямо из content script через blob-URL. Вероятно, понадобится на этапе 7 |
 | `host_permissions` | этап 7 | Загрузка картинки в обход CORS, когда canvas «испорчен» (tainted). На этапе 2 частично решено повторной загрузкой с `crossOrigin` — работает, если сервер отдаёт `Access-Control-Allow-Origin` |
 | `downloads` | **не понадобилось** | Скачивание сделано ссылкой `<a download>`; API расширения потребовало бы отдельного предупреждения при установке |
+| `web_accessible_resources` | ✅ этап 5 | `ml-worker.js`, модель и `.wasm` должны быть доступны странице: воркер создаётся из blob-URL с её источником |
+| CSP `wasm-unsafe-eval` | ✅ этап 5 | По умолчанию CSP расширений запрещает компиляцию WebAssembly |
 | `notifications` | будущий видео-этап | Уведомление о завершении долгой фоновой обработки |
 
 ## Команды

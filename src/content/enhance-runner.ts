@@ -1,6 +1,7 @@
 import { createEnhancer } from '@/core/enhance'
 import type { EnhanceOptions, EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
+import { getMlRuntime, isMlApplicable } from './ml-client'
 import { type EnhancePool, createEnhancePool } from './worker-pool'
 
 /**
@@ -44,6 +45,33 @@ export async function runEnhance(
   if (pool === undefined) {
     pool = createEnhancePool()
     log.info(pool ? `Вычисления в воркерах, размер пула: ${pool.size}` : 'Воркеры недоступны, считаю в потоке страницы')
+  }
+
+  /**
+   * ML пробуется первым, но только когда он уместен.
+   *
+   * Условий два, и оба проверяются ДО передачи картинки: после transfer
+   * откатиться уже некуда, потому что владение ушло.
+   *  - размер входа в пределах потолка выбранного бэкенда;
+   *  - запрошенное увеличение близко к двукратному — это архитектура
+   *    модели, а не настройка.
+   *
+   * Отмена на ML не распространяется: единственный воркер держит
+   * загруженную модель, и terminate() выбросил бы её вместе с секундой
+   * повторной загрузки. Для одной картинки, которая считается доли
+   * секунды на WebGPU, это плохой размен.
+   */
+  if (!signal?.aborted) {
+    const ml = await getMlRuntime()
+    if (ml && isMlApplicable(ml, input.bitmap.width, input.bitmap.height, options.scale)) {
+      try {
+        return await ml.run(input.bitmap, input.sourceUrl)
+      } catch (error) {
+        // Картинка уже передана воркеру — откатиться на классику нельзя.
+        log.error('ML-обработка не удалась:', error)
+        throw error
+      }
+    }
   }
 
   if (pool) {

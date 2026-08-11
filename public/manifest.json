@@ -42,5 +42,16 @@
     "open_in_tab": true
   },
 
-  "permissions": ["storage", "contextMenus"]
+  "permissions": ["storage", "contextMenus"],
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["ml-worker.js", "models/*", "wasm/*"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ]
 }
