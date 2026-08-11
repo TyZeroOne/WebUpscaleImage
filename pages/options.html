@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>ImageEnhancer — настройки</title>
+    <script type="module" src="/src/options/main.ts"></script>
+  </head>
+  <body style="max-width: 640px; margin: 0 auto">
+    <header class="ie-header">
+      <img src="/icons/icon48.png" alt="" />
+      <h1>ImageEnhancer — настройки</h1>
+      <span class="ie-version" id="version">—</span>
+    </header>
+
+    <ul class="ie-rows">
+      <li>
+        <label class="ie-check">
+          <input type="checkbox" id="verbose-logging" />
+          <span>
+            Подробные логи в консоли
+            <small>Пригодится, если нужно понять, почему картинка не обработалась.</small>
+          </span>
+        </label>
+        <b id="save-state"></b>
+      </li>
+    </ul>
+
+    <p class="ie-note">
+      Этап 0: страница-каркас. Выбор уровня качества «быстро / сбалансировано / качественно»
+      и остальные настройки появятся на этапе 6.
+    </p>
+  </body>
+</html>

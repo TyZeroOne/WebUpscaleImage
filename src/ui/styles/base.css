@@ -1,0 +1,144 @@
+/*
+ * Общие стили страниц расширения (popup и options).
+ *
+ * Специально без CSS-фреймворков: страницы расширения весят единицы килобайт,
+ * и тянуть ради них Tailwind/Bootstrap — значит увеличить размер пакета
+ * в десятки раз ради двух экранов.
+ *
+ * Тема следует системной: расширение открывается поверх любых сайтов,
+ * и светлое окно в тёмной системе выглядит как ошибка.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --ie-bg: #ffffff;
+  --ie-fg: #16181d;
+  --ie-muted: #6b7280;
+  --ie-border: #e4e6eb;
+  --ie-surface: #f6f7f9;
+  --ie-accent: #4f7df3;
+  --ie-ok: #16a34a;
+  --ie-fail: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ie-bg: #16181d;
+    --ie-fg: #e8eaed;
+    --ie-muted: #9aa0a6;
+    --ie-border: #2c2f36;
+    --ie-surface: #1f2229;
+    --ie-accent: #7d9bf7;
+    --ie-ok: #4ade80;
+    --ie-fail: #f87171;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--ie-bg);
+  color: var(--ie-fg);
+  font: 13px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ie-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ie-border);
+}
+
+.ie-header img {
+  width: 28px;
+  height: 28px;
+}
+
+.ie-version {
+  margin-left: auto;
+  color: var(--ie-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ie-rows {
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ie-rows li {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.ie-rows dfn {
+  color: var(--ie-muted);
+  font-style: normal;
+}
+
+.ie-rows b {
+  font-weight: 600;
+  text-align: right;
+}
+
+.ie-ok {
+  color: var(--ie-ok);
+}
+
+.ie-fail {
+  color: var(--ie-fail);
+}
+
+.ie-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ie-surface);
+  color: var(--ie-muted);
+}
+
+.ie-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+button {
+  padding: 6px 12px;
+  border: 1px solid var(--ie-border);
+  border-radius: 6px;
+  background: var(--ie-surface);
+  color: var(--ie-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--ie-accent);
+}
+
+label.ie-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+label.ie-check small {
+  display: block;
+  color: var(--ie-muted);
+}

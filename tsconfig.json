@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    /* Целевая среда: расширение работает только в Chrome 116+, поэтому
+       понижать синтаксис до ES5 бессмысленно — теряем читаемость сборки. */
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+
+    /* Типы, которые должны быть видны глобально.
+       chrome      — API расширений (chrome.runtime, chrome.storage, ...)
+       node        — только для файлов сборки (scripts/, vite.config.ts)
+       vite/client — типы import.meta.env (DEV/PROD) */
+    "types": ["chrome", "node", "vite/client"],
+
+    /* Строгость. Включено всё, что ловит реальные ошибки на этапе компиляции. */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    /* Сборкой занимается Vite, tsc используется только как проверяльщик типов. */
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    /* Алиас @/ -> src/. В TypeScript 7 опция baseUrl удалена, а пути
+       в "paths" обязаны быть относительными — отсюда "./src/*". */
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "vite.config.ts", "vite.content.config.ts"]
+}

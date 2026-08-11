@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>ImageEnhancer</title>
+    <script type="module" src="/src/popup/main.ts"></script>
+  </head>
+  <body style="width: 320px">
+    <header class="ie-header">
+      <img src="/icons/icon48.png" alt="" />
+      <h1>ImageEnhancer</h1>
+      <span class="ie-version" id="version">—</span>
+    </header>
+
+    <ul class="ie-rows">
+      <li><dfn>Service worker</dfn><b id="sw">проверяю…</b></li>
+      <li><dfn>WebGPU API</dfn><b id="webgpu">—</b></li>
+      <li><dfn>OffscreenCanvas</dfn><b id="offscreen">—</b></li>
+      <li><dfn>createImageBitmap</dfn><b id="bitmap">—</b></li>
+      <li><dfn>Ядер CPU</dfn><b id="cores">—</b></li>
+      <li><dfn>Память</dfn><b id="memory">—</b></li>
+    </ul>
+
+    <p class="ie-note">
+      Этап 0: собран каркас расширения. Обработка изображений появится на этапе 2.
+    </p>
+
+    <div class="ie-actions">
+      <button id="open-options" type="button">Настройки</button>
+    </div>
+  </body>
+</html>
