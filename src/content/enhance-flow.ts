@@ -1,14 +1,10 @@
-import {
-  DEFAULT_QUALITY_LEVEL,
-  createEnhancer,
-  resolveScale,
-  resolveTargetSize,
-} from '@/core/enhance'
+import { DEFAULT_QUALITY_LEVEL, resolveScale, resolveTargetSize } from '@/core/enhance'
 import { createLogger } from '@/core/log'
 import { sendToBackground } from '@/core/messaging'
 import type { EnhanceTrigger } from '@/core/messaging'
 import type { Toaster } from '@/ui/toast'
 import { buildFileName, downloadBlob, replaceOnPage, restoreOriginal } from './apply-result'
+import { isWorkerModeActive, runEnhance } from './enhance-runner'
 import { ImageSourceError, acquireReadableBitmap } from './image-source'
 import { yieldUntilPainted } from './scheduler'
 
@@ -25,23 +21,23 @@ import { yieldUntilPainted } from './scheduler'
  * Сама же работа обязана быть одна и та же — иначе два режима начнут
  * расходиться в поведении.
  *
- * ГДЕ ЭТО ВЫПОЛНЯЕТСЯ И ПОЧЕМУ ЭТО ВРЕМЕННО
+ * ГДЕ ЭТО ВЫПОЛНЯЕТСЯ
  *
- * На этапе 2-3 вычисления идут прямо здесь — в главном потоке страницы,
- * и это будет исправлено на этапе 4. Замеренная стоимость фильтра
- * (Ланцош, радиус 2 / радиус 3):
+ * С этапа 4 вычисления идут в пуле воркеров (см. enhance-runner.ts):
+ * главный поток страницы занят только получением пикселей и подменой
+ * картинки, то есть долями миллисекунды.
+ *
+ * Стоимость самого фильтра не изменилась — она просто перестала быть
+ * временем, на которое замирает страница (Ланцош, радиус 2 / радиус 3):
  *
  *     640×480   -> 1280×960     46 / 53 мс
  *     960×540   -> 1920×1080    66 / 85 мс
  *     1920×1080 -> 3840×2160   253 / 325 мс
  *     3000×2000 -> 4472×2981   443 / 578 мс
  *
- * Плюс кодирование результата в PNG. То есть на крупной картинке страница
- * замирает почти на секунду — терпимо для одного изображения и очень
- * заметно для очереди из этапа 3.
- *
- * Модуль core/enhance/ к переносу готов: он не обращается ни к DOM,
- * ни к chrome API и работает только с OffscreenCanvas, который есть и в Worker.
+ * Если воркеры недоступны (политика безопасности страницы запрещает
+ * blob-воркеры), расширение считает на месте, как на этапах 2-3, —
+ * медленнее для страницы, но работает.
  */
 
 const log = createLogger('enhance')
@@ -123,20 +119,31 @@ export async function enhanceImageCore(
   })
 
   let bitmap: ImageBitmap | undefined
+  let handedOff = false
   try {
     bitmap = await acquireReadableBitmap(image)
+    /**
+     * Размеры запоминаются ДО передачи в воркер. После transfer объект
+     * в этом потоке отсоединён, и bitmap.width вернёт 0 — в логе оказались бы
+     * бессмысленные «0×0 → 3840×2160».
+     */
+    const sourceSize = `${bitmap.width}×${bitmap.height}`
+
     await yieldUntilPainted()
 
-    const enhancer = createEnhancer(DEFAULT_QUALITY_LEVEL)
-    const result = await enhancer.enhance(
+    // С этого момента картинкой владеет runEnhance: она либо уедет в воркер
+    // вместе с владением, либо будет освобождена там же после вычислений.
+    handedOff = true
+    const result = await runEnhance(
       { bitmap, sourceUrl },
       { level: DEFAULT_QUALITY_LEVEL, scale },
       signal,
     )
 
     log.info(
-      `Готово за ${result.durationMs} мс (${result.backend}): ` +
-        `${bitmap.width}×${bitmap.height} → ${result.width}×${result.height}, ` +
+      `Готово за ${result.durationMs} мс (${result.backend}, ` +
+        `${isWorkerModeActive() ? 'воркер' : 'поток страницы'}): ` +
+        `${sourceSize} → ${result.width}×${result.height}, ` +
         `${Math.round(result.blob.size / 1024)} КБ`,
     )
 
@@ -151,12 +158,11 @@ export async function enhanceImageCore(
     }
   } finally {
     /**
-     * ImageBitmap держит несжатые пиксели вне кучи JavaScript, и сборщик
-     * мусора освобождает их не сразу. Для картинки 4000×3000 это 48 МБ,
-     * которые иначе провисят до следующей сборки. close() освобождает их
-     * немедленно.
+     * Освобождаем только если картинка так и не была передана дальше:
+     * ImageBitmap держит несжатые пиксели вне кучи JavaScript (48 МБ
+     * для 4000×3000), и сборщик мусора не спешит их забирать.
      */
-    bitmap?.close()
+    if (!handedOff) bitmap?.close()
     inFlight.delete(image)
   }
 }

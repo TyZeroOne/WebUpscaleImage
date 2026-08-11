@@ -4,7 +4,8 @@ import type { Toaster } from '@/ui/toast'
 import { hasOriginal, restoreOriginal } from './apply-result'
 import { scanMedia } from './detect'
 import { describeFailure, enhanceImageCore } from './enhance-flow'
-import { DEFAULT_CONCURRENCY, runQueue } from './queue'
+import { resolveConcurrency } from './enhance-runner'
+import { runQueue } from './queue'
 
 /**
  * Режим «вся страница»: обработать все подходящие картинки очередью.
@@ -129,7 +130,9 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
       const failures = new Map<string, number>()
 
       const result = await runQueue(tasks, {
-        concurrency: DEFAULT_CONCURRENCY,
+        // Считается один раз на запуск: зависит от того, поднялись ли воркеры,
+        // а это выясняется при первой попытке их создать.
+        concurrency: resolveConcurrency(),
         signal: controller.signal,
         onProgress: (progress) => panel.update(progress),
         onItemFailed: (index, error) => {
