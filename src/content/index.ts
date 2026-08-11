@@ -1,30 +1,110 @@
 import { createLogger, setVerboseLogging } from '@/core/log'
-import { sendToBackground } from '@/core/messaging'
+import { registerMessageHandlers, sendToBackground } from '@/core/messaging'
+import type { EnhanceTrigger } from '@/core/messaging'
 import { getSettings } from '@/core/settings'
+import { createHighlight } from '@/ui/highlight'
+import { createOverlayButton } from '@/ui/overlay-button'
+import { createToaster } from '@/ui/toast'
 import { VIDEO_ENHANCEMENT_ENABLED } from '@/video'
-import { scanMedia } from './detect'
+import { findImageBySource, scanMedia } from './detect'
+import { createHoverTracker } from './hover'
+import { getUiRoot } from './ui-root'
 
 /**
  * Content script — код, который Chrome внедряет в каждую http(s)-страницу.
  *
- * Важное про изоляцию: content script живёт в «изолированном мире». У него
- * общий DOM со страницей, но собственный набор JS-объектов. Скрипты страницы
- * не видят наших переменных, а мы не видим их. Это защищает и нас, и страницу.
+ * Изоляция: у content script общий DOM со страницей, но собственное
+ * JS-окружение. Скрипты страницы не видят наших переменных, мы не видим их.
  *
- * Ограничение, которое определит архитектуру дальше: здесь НЕЛЬЗЯ считать
- * тяжёлые вещи. Это тот же поток, что и UI страницы — любая долгая операция
- * подвесит сайт пользователя. Поэтому вычисления уедут в Worker (этап 4),
- * а content script останется только детектором и рисовальщиком оверлеев.
+ * Ограничение, определяющее архитектуру: это главный поток страницы.
+ * Долгое вычисление здесь заморозит сайт пользователя, поэтому content script
+ * навсегда останется детектором и рисовальщиком UI, а считать будет Worker
+ * (этап 4).
  */
 
 const log = createLogger('content')
+
+/** Сколько держать рамку вокруг картинки, выбранной через контекстное меню. */
+const HIGHLIGHT_DURATION_MS = 1600
+
+function bootstrapUi(): void {
+  const { host, layer } = getUiRoot()
+  const button = createOverlayButton(layer)
+  const toaster = createToaster(layer)
+  const highlight = createHighlight(layer)
+
+  let hovered: HTMLImageElement | null = null
+
+  createHoverTracker({
+    button,
+    host,
+    onChange: (image) => {
+      hovered = image
+    },
+  })
+
+  /** Общая точка запроса на улучшение — и для кнопки, и для контекстного меню. */
+  const requestEnhance = async (image: HTMLImageElement, trigger: EnhanceTrigger) => {
+    log.debug(`Запрос на улучшение (${trigger}):`, image.currentSrc || image.src)
+
+    const response = await sendToBackground('ENHANCE_IMAGE', {
+      sourceUrl: image.currentSrc || image.src,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      trigger,
+    })
+
+    if (!response) {
+      toaster.show('Расширение не отвечает. Попробуйте обновить страницу.', 'error')
+      return
+    }
+    toaster.show(response.message, response.accepted ? 'info' : 'error')
+  }
+
+  button.onClick(() => {
+    if (!hovered) return
+    void requestEnhance(hovered, 'overlay')
+  })
+
+  // Контекстное меню приходит из service worker'а: сам пункт меню живёт там,
+  // а картинку по URL умеет найти только страница.
+  registerMessageHandlers({
+    CONTEXT_MENU_ENHANCE: async (payload) => {
+      const image = findImageBySource(payload.srcUrl)
+      if (!image) {
+        // Реальный случай: картинка внутри iframe, а мы туда не внедряемся,
+        // либо страница подменила src между кликом и доставкой сообщения.
+        toaster.show('Не удалось найти эту картинку на странице.', 'error')
+        return { handled: false }
+      }
+      highlight.showFor(image.getBoundingClientRect(), HIGHLIGHT_DURATION_MS)
+      await requestEnhance(image, 'context-menu')
+      return { handled: true }
+    },
+
+    SCAN_PAGE: () => {
+      const media = scanMedia()
+      return { url: location.href, images: media.images.length, videos: media.videos.length }
+    },
+  })
+}
+
+/**
+ * UI и слушатели поднимаются СИНХРОННО, до любого await.
+ *
+ * То же правило, что и в service worker'е, но по другой причине: пользователь
+ * может нажать правой кнопкой на картинку через долю секунды после загрузки
+ * страницы. Если бы registerMessageHandlers стоял после `await getSettings()`,
+ * сообщение из контекстного меню пришло бы раньше слушателя и потерялось —
+ * причём воспроизводилось бы это только на медленной машине.
+ */
+bootstrapUi()
 
 async function bootstrap(): Promise<void> {
   const settings = await getSettings()
   setVerboseLogging(import.meta.env.DEV || settings.verboseLogging)
 
   const media = scanMedia()
-
   log.info(
     `Страница просканирована: изображений ${media.images.length}, ` +
       `видео ${media.videos.length} (обработка видео: ${
@@ -32,13 +112,11 @@ async function bootstrap(): Promise<void> {
       })`,
   )
 
-  const response = await sendToBackground('PAGE_SCAN', {
+  await sendToBackground('PAGE_SCAN', {
     url: location.href,
     images: media.images.length,
     videos: media.videos.length,
   })
-
-  log.debug('Ответ service worker:', response)
 }
 
 void bootstrap()

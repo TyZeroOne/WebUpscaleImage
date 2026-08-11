@@ -1,7 +1,7 @@
 import '@/ui/styles/base.css'
 import { detectCapabilities } from '@/core/device'
 import { createLogger } from '@/core/log'
-import { sendToBackground } from '@/core/messaging'
+import { sendToBackground, sendToTab } from '@/core/messaging'
 
 /**
  * Popup — окно, которое открывается по клику на иконку расширения.
@@ -46,9 +46,35 @@ async function pingBackground(): Promise<void> {
   setText('sw', `отвечает (${elapsed} мс)`, 'ok')
 }
 
+/**
+ * Спрашиваем у активной вкладки, что на ней есть.
+ *
+ * Popup не имеет доступа к DOM страницы — он вообще другой документ, в другом
+ * контексте. Единственный способ узнать про страницу — спросить content script.
+ *
+ * chrome.tabs.query без разрешения `tabs` возвращает вкладки, но без url
+ * и title. Нам нужен только id, поэтому разрешение не требуется.
+ */
+async function scanActiveTab(): Promise<void> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+  if (tab?.id === undefined) return
+
+  const result = await sendToTab(tab.id, 'SCAN_PAGE', {})
+  if (!result) {
+    // Штатная ситуация: служебная страница (chrome://, страница настроек,
+    // Chrome Web Store), куда content script не внедряется по правилам Chrome.
+    setText('page-images', 'нет доступа')
+    setText('page-videos', 'нет доступа')
+    return
+  }
+  setText('page-images', String(result.images))
+  setText('page-videos', String(result.videos))
+}
+
 setText('version', `v${chrome.runtime.getManifest().version}`)
 renderCapabilities()
 void pingBackground().catch((error: unknown) => log.error('PING не прошёл:', error))
+void scanActiveTab().catch((error: unknown) => log.error('Опрос вкладки не прошёл:', error))
 
 document.getElementById('open-options')?.addEventListener('click', () => {
   void chrome.runtime.openOptionsPage()

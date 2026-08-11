@@ -46,6 +46,41 @@ export async function sendToBackground<K extends MessageKind>(
 }
 
 /**
+ * Отправка сообщения В content script конкретной вкладки.
+ *
+ * Это ДРУГОЙ канал, не тот, что у sendToBackground:
+ *   chrome.runtime.sendMessage — «всем контекстам расширения» (service worker,
+ *                                popup, options). Content script его НЕ получит.
+ *   chrome.tabs.sendMessage    — «в content script указанной вкладки».
+ *
+ * Путаница между ними — типовая причина сообщений, которые «уходят в никуда»:
+ * отправитель не видит ошибки, получатель ничего не получает.
+ *
+ * @param frameId номер фрейма. По умолчанию 0 — главный фрейм страницы;
+ *                мы не внедряемся в iframe (all_frames: false в манифесте).
+ */
+export async function sendToTab<K extends MessageKind>(
+  tabId: number,
+  kind: K,
+  payload: RequestOf<K>,
+  frameId = 0,
+): Promise<ResponseOf<K> | null> {
+  const envelope: MessageEnvelope<K> = { source: MESSAGE_SOURCE, kind, payload }
+  try {
+    const response = (await chrome.tabs.sendMessage(tabId, envelope, { frameId })) as
+      | ResponseOf<K>
+      | undefined
+    return response ?? null
+  } catch (error) {
+    // Штатные случаи: вкладку закрыли; страница служебная (chrome://,
+    // Chrome Web Store), куда content script не внедряется вовсе;
+    // страница ещё не догрузилась.
+    log.warn(`Сообщение ${kind} не доставлено во вкладку ${tabId}:`, error)
+    return null
+  }
+}
+
+/**
  * Регистрация обработчиков входящих сообщений.
  *
  * Ключевой момент — `return true` в слушателе. Он говорит Chrome:

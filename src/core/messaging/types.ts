@@ -12,6 +12,9 @@
 /** Метка «своё» сообщение. Страница тоже может слать сообщения — их надо отсекать. */
 export const MESSAGE_SOURCE = 'image-enhancer'
 
+/** Откуда пришёл запрос на улучшение — влияет на то, как показывать результат. */
+export type EnhanceTrigger = 'overlay' | 'context-menu'
+
 /**
  * Единственное место, куда добавляются новые типы сообщений.
  * Каждый следующий этап дописывает сюда свои записи.
@@ -27,6 +30,33 @@ export interface MessageContracts {
   PAGE_SCAN: {
     request: { url: string; images: number; videos: number }
     response: { received: true }
+  }
+
+  /**
+   * Пользователь попросил улучшить конкретную картинку.
+   * Этап 1: обработчик только логирует и отвечает отказом с причиной.
+   * Этап 2: здесь начнётся реальный пайплайн.
+   */
+  ENHANCE_IMAGE: {
+    request: {
+      sourceUrl: string
+      naturalWidth: number
+      naturalHeight: number
+      trigger: EnhanceTrigger
+    }
+    response: { accepted: boolean; message: string }
+  }
+
+  /** Popup спрашивает у вкладки, что на ней есть. Идёт через chrome.tabs.sendMessage. */
+  SCAN_PAGE: {
+    request: Record<string, never>
+    response: { url: string; images: number; videos: number }
+  }
+
+  /** Service worker передаёт во вкладку выбор пункта контекстного меню. */
+  CONTEXT_MENU_ENHANCE: {
+    request: { srcUrl: string }
+    response: { handled: boolean }
   }
 }
 

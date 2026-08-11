@@ -1,0 +1,158 @@
+/*
+ * Стили UI, который расширение рисует поверх ЧУЖОЙ страницы.
+ *
+ * Весь этот CSS живёт внутри closed shadow root (см. src/content/ui-root.ts),
+ * поэтому он не может протечь на страницу, а стили страницы не могут протечь
+ * сюда. Именно поэтому здесь допустимы короткие имена классов вроде .button —
+ * коллизий с сайтом не будет физически.
+ *
+ * Единственное, что всё-таки наследуется внутрь shadow root, — наследуемые
+ * свойства (font, color, line-height и т.п.) от host-элемента. Поэтому :host
+ * сбрасывает их явно.
+ */
+
+:host {
+  all: initial;
+  font: 500 12px/1.2 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.layer {
+  position: fixed;
+  inset: 0;
+  /* Слой сквозной для мыши: клики уходят на страницу. Интерактивные
+     элементы внутри включают pointer-events обратно точечно. */
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------ кнопка над картинкой */
+
+.button {
+  position: fixed;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(20, 22, 28, 0.82);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease;
+}
+
+.button[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+.button:hover {
+  background: rgba(79, 125, 243, 0.95);
+}
+
+.button svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* На узких картинках подпись не помещается — остаётся круглая кнопка-иконка. */
+.button[data-compact='true'] {
+  padding: 0;
+  width: 28px;
+  justify-content: center;
+}
+
+.button[data-compact='true'] .label {
+  display: none;
+}
+
+/* ------------------------------------------------ подсветка целевой картинки */
+
+.highlight {
+  position: fixed;
+  border: 2px solid #4f7df3;
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px rgba(79, 125, 243, 0.25);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.highlight[data-visible='true'] {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------- тосты */
+
+.toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  /* Контейнер прижат к нижнему краю, элементы идут сверху вниз: новый тост
+     появляется у самого угла, а старые выдавливаются вверх. */
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(20, 22, 28, 0.92);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font: 400 12px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.toast[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+.toast[data-tone='error'] {
+  background: rgba(120, 26, 26, 0.94);
+}
+
+.toast .dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #4f7df3;
+}
+
+.toast[data-tone='error'] .dot {
+  background: #f87171;
+}
+
+/*
+ * Пользователи, попросившие ОС уменьшить анимацию, не должны видеть
+ * наши переходы: расширение появляется поверх контента, и лишнее движение
+ * здесь раздражает сильнее, чем на обычном сайте.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .toast,
+  .highlight {
+    transition: none;
+  }
+}

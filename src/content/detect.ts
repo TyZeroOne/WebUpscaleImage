@@ -31,6 +31,25 @@ export function isEnhanceableImage(img: HTMLImageElement): boolean {
   return true
 }
 
+/**
+ * Поиск картинки по URL, пришедшему извне (из контекстного меню).
+ *
+ * Chrome даёт в info.srcUrl абсолютный URL того, что реально отображается.
+ * Поэтому сравнивать нужно с currentSrc, а не с атрибутом src:
+ *  - при наличии srcset браузер выбирает один из вариантов, и это не src;
+ *  - src может быть относительным, а currentSrc всегда абсолютный.
+ *
+ * querySelector(`img[src="..."]`) по этим же причинам ненадёжен, плюс
+ * ломается на URL со спецсимволами.
+ */
+export function findImageBySource(sourceUrl: string): HTMLImageElement | null {
+  if (!sourceUrl) return null
+  for (const img of document.querySelectorAll('img')) {
+    if (img.currentSrc === sourceUrl || img.src === sourceUrl) return img
+  }
+  return null
+}
+
 export function scanMedia(root: ParentNode = document): MediaScanResult {
   return {
     images: Array.from(root.querySelectorAll('img')).filter(isEnhanceableImage),
