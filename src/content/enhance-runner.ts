@@ -1,4 +1,4 @@
-import { createEnhancer } from '@/core/enhance'
+import { createEnhancer, isMlAllowed, resolvePlan } from '@/core/enhance'
 import type { EnhanceOptions, EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
 import { getMlRuntime, isMlApplicable } from './ml-client'
@@ -50,9 +50,13 @@ export async function runEnhance(
   /**
    * ML пробуется первым, но только когда он уместен.
    *
-   * Условий два, и оба проверяются ДО передачи картинки: после transfer
-   * откатиться уже некуда, потому что владение ушло.
-   *  - размер входа в пределах потолка выбранного бэкенда;
+   * Условия проверяются ДО передачи картинки: после transfer откатиться
+   * уже некуда, потому что владение ушло.
+   *  - уровень качества вообще разрешает ML (на «быстро» — нет);
+   *  - бэкенд подходит под уровень (на «сбалансированно» ML только
+   *    на WebGPU: на WASM он стоил бы секунды и перестал бы быть
+   *    компромиссом);
+   *  - размер входа в пределах потолка бэкенда;
    *  - запрошенное увеличение близко к двукратному — это архитектура
    *    модели, а не настройка.
    *
@@ -60,10 +64,18 @@ export async function runEnhance(
    * загруженную модель, и terminate() выбросил бы её вместе с секундой
    * повторной загрузки. Для одной картинки, которая считается доли
    * секунды на WebGPU, это плохой размен.
+   *
+   * Воркер вообще не поднимается, если уровень его не разрешает —
+   * иначе на «быстро» мы платили бы 800 КБ загрузки впустую.
    */
-  if (!signal?.aborted) {
+  const plan = resolvePlan(options.level)
+  if (!signal?.aborted && plan.useMl) {
     const ml = await getMlRuntime()
-    if (ml && isMlApplicable(ml, input.bitmap.width, input.bitmap.height, options.scale)) {
+    if (
+      ml &&
+      isMlAllowed(options.level, ml.backend) &&
+      isMlApplicable(ml, input.bitmap.width, input.bitmap.height, options.scale)
+    ) {
       try {
         return await ml.run(input.bitmap, input.sourceUrl)
       } catch (error) {

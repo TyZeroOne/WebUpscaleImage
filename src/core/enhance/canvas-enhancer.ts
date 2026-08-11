@@ -4,7 +4,6 @@ import type {
   EnhanceOptions,
   EnhanceResult,
   ImageEnhancer,
-  QualityLevel,
 } from './types'
 import { resampleLanczos } from './lanczos'
 
@@ -17,12 +16,6 @@ import { resampleLanczos } from './lanczos'
  * За счёт этого перенос вычислений в Worker на этапе 4 не потребует
  * переписывать сам апскейлер.
  */
-
-/** Радиус окна Ланцоша для каждого уровня качества. */
-const KERNEL_RADIUS: Record<Exclude<QualityLevel, 'fast'>, number> = {
-  balanced: 2,
-  quality: 3,
-}
 
 /**
  * Потолок размера результата, в пикселях.
@@ -64,8 +57,14 @@ function context2d(canvas: OffscreenCanvas, willReadFrequently = false): Offscre
 export class CanvasEnhancer implements ImageEnhancer {
   readonly backend: EnhanceBackend
 
-  constructor(private readonly level: QualityLevel) {
-    this.backend = level === 'fast' ? 'canvas-bilinear' : 'canvas-lanczos'
+  /**
+   * @param radius радиус окна Ланцоша, либо null — масштабировать
+   *               средствами браузера. Значение приходит из правил уровня
+   *               качества (core/enhance/policy.ts), а не выводится здесь:
+   *               апскейлер не должен знать про уровни.
+   */
+  constructor(private readonly radius: number | null) {
+    this.backend = radius === null ? 'canvas-bilinear' : 'canvas-lanczos'
   }
 
   /** Canvas 2D есть везде, где вообще может исполняться расширение. */
@@ -85,9 +84,9 @@ export class CanvasEnhancer implements ImageEnhancer {
     assertNotAborted(signal)
 
     const canvas =
-      this.backend === 'canvas-bilinear'
+      this.radius === null
         ? this.scaleNative(bitmap, target.width, target.height)
-        : this.scaleLanczos(bitmap, target.width, target.height, signal)
+        : this.scaleLanczos(bitmap, target.width, target.height, this.radius, signal)
 
     assertNotAborted(signal)
 
@@ -135,6 +134,7 @@ export class CanvasEnhancer implements ImageEnhancer {
     bitmap: ImageBitmap,
     width: number,
     height: number,
+    radius: number,
     signal: AbortSignal | undefined,
   ): OffscreenCanvas {
     const source = new OffscreenCanvas(bitmap.width, bitmap.height)
@@ -153,7 +153,6 @@ export class CanvasEnhancer implements ImageEnhancer {
     const sourceData = sourceCtx.getImageData(0, 0, bitmap.width, bitmap.height)
     assertNotAborted(signal)
 
-    const radius = KERNEL_RADIUS[this.level === 'quality' ? 'quality' : 'balanced']
     const resampled = resampleLanczos(sourceData, width, height, radius)
 
     const canvas = new OffscreenCanvas(width, height)

@@ -1,23 +1,32 @@
+import type { QualityLevel } from '@/core/enhance/types'
 import { createLogger } from '@/core/log'
 
 /**
  * Настройки расширения.
  *
- * На этапе 0 здесь ровно один флаг — этого достаточно, чтобы проверить, что
- * chrome.storage работает и что options-страница действительно связана с
- * остальным расширением. Полноценный набор настроек (уровень качества,
- * автоматический режим, лимит параллелизма) появится на этапе 6.
+ * До этапа 6 здесь был один флаг — он существовал ради проверки того, что
+ * связка «страница настроек -> storage -> все контексты» вообще работает.
+ * Теперь настройки начали влиять на поведение.
  */
 
 const log = createLogger('settings')
 
+/** Что выбрал пользователь. 'auto' — пусть решает расширение по железу. */
+export type QualityPreference = QualityLevel | 'auto'
+
 export interface Settings {
   /** Подробные логи в консоли. Нужен, когда пользователь присылает баг-репорт. */
   verboseLogging: boolean
+  /** Уровень качества обработки. */
+  quality: QualityPreference
+  /** Подменять картинку прямо на странице или только предлагать скачать. */
+  replaceOnPage: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   verboseLogging: false,
+  quality: 'auto',
+  replaceOnPage: true,
 }
 
 /**
@@ -29,26 +38,51 @@ export const DEFAULT_SETTINGS: Settings = {
 const AREA = chrome.storage.sync
 
 /**
+ * Кеш прочитанных настроек.
+ *
+ * Без него режим «вся страница» делал бы по обращению к хранилищу на каждую
+ * картинку — полсотни лишних асинхронных вызовов за прогон. Кеш сбрасывается
+ * по событию изменения, поэтому разъехаться с хранилищем не может.
+ */
+let cache: Settings | null = null
+
+/**
  * Обобщённый параметр <Settings> обязателен: без него @types/chrome выводит
  * тип хранилища как индексируемый `{ [key: string]: unknown }`, а обычный
  * интерфейс в такой тип не присваивается (у интерфейсов нет неявной
  * индексной сигнатуры). Заодно get() возвращает сразу Settings, а не unknown.
  */
 export async function getSettings(): Promise<Settings> {
+  if (cache) return cache
   try {
     // Передача объекта по умолчанию — штатный способ chrome.storage вернуть
     // значения для ключей, которых в хранилище ещё нет.
     const stored = await AREA.get<Settings>(DEFAULT_SETTINGS)
-    return { ...DEFAULT_SETTINGS, ...stored }
+    cache = { ...DEFAULT_SETTINGS, ...stored }
   } catch (error) {
     log.error('Не удалось прочитать настройки, беру значения по умолчанию:', error)
-    return { ...DEFAULT_SETTINGS }
+    cache = { ...DEFAULT_SETTINGS }
   }
+  return cache
 }
 
 export async function patchSettings(patch: Partial<Settings>): Promise<void> {
   await AREA.set<Settings>(patch)
 }
+
+/**
+ * Сброс кеша при любом изменении настроек.
+ *
+ * Слушатель вешается на уровне модуля, а не внутри функции: изменение может
+ * прийти из другого контекста расширения (страница настроек — это отдельный
+ * документ), и узнать о нём надо независимо от того, спрашивал ли кто-то
+ * настройки в этот момент.
+ */
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'sync') return
+  if (!Object.keys(changes).some((key) => key in DEFAULT_SETTINGS)) return
+  cache = null
+})
 
 /** Подписка на изменения настроек — работает во всех контекстах расширения. */
 export function onSettingsChanged(listener: (settings: Settings) => void): void {

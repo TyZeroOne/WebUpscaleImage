@@ -137,8 +137,8 @@ image-enhancer/
 | 3 | Режим «вся страница» | [04_Stage3_PageMode_Impl.md](04_Stage3_PageMode_Impl.md) | [04_Stage3_PageMode_Guide.md](04_Stage3_PageMode_Guide.md) | ✅ готов |
 | 4 | Вынос вычислений в Web Worker | [05_Stage4_Worker_Impl.md](05_Stage4_Worker_Impl.md) | [05_Stage4_Worker_Guide.md](05_Stage4_Worker_Guide.md) | ✅ готов |
 | 5 | ML-апскейл | [06_Stage5_MlUpscale_Impl.md](06_Stage5_MlUpscale_Impl.md) | [06_Stage5_MlUpscale_Guide.md](06_Stage5_MlUpscale_Guide.md) | ✅ готов |
-| 6 | Уровни качества и настройки | — | — | следующий |
-| 7 | Устойчивость: CORS и ошибки | — | — | |
+| 6 | Уровни качества и настройки | [07_Stage6_Settings_Impl.md](07_Stage6_Settings_Impl.md) | [07_Stage6_Settings_Guide.md](07_Stage6_Settings_Guide.md) | ✅ готов |
+| 7 | Устойчивость: CORS и ошибки | — | — | следующий |
 | 8 | Заглушка видео-архитектуры | — | — | |
 | 9 | Полировка и упаковка | — | — | |
 

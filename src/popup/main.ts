@@ -1,7 +1,8 @@
 import '@/ui/styles/base.css'
-import { detectCapabilities } from '@/core/device'
+import { detectCapabilities, recommendLevel } from '@/core/device'
 import { createLogger } from '@/core/log'
 import { sendToBackground, sendToTab } from '@/core/messaging'
+import { getSettings } from '@/core/settings'
 
 /**
  * Popup — окно, которое открывается по клику на иконку расширения.
@@ -23,6 +24,29 @@ function setText(id: string, text: string, state?: 'ok' | 'fail'): void {
   if (!node) return
   node.textContent = text
   node.className = state ? `ie-${state}` : ''
+}
+
+const LEVEL_NAMES: Record<string, string> = {
+  fast: 'быстро',
+  balanced: 'сбалансированно',
+  quality: 'качественно',
+}
+
+/**
+ * Показывается ДЕЙСТВУЮЩИЙ уровень, а не значение настройки.
+ *
+ * При выборе «автоматически» строка «авто» ничего не сообщает: пользователь
+ * хочет знать, что расширение будет делать, а не как оно это решило.
+ * Поэтому «авто» разворачивается в конкретный уровень с пометкой.
+ */
+async function renderQuality(): Promise<void> {
+  const settings = await getSettings()
+  if (settings.quality !== 'auto') {
+    setText('quality', LEVEL_NAMES[settings.quality] ?? settings.quality)
+    return
+  }
+  const level = recommendLevel(await detectCapabilities())
+  setText('quality', `${LEVEL_NAMES[level] ?? level} (авто)`)
 }
 
 async function renderCapabilities(): Promise<void> {
@@ -101,6 +125,7 @@ async function startPageEnhance(): Promise<void> {
 
 setText('version', `v${chrome.runtime.getManifest().version}`)
 void renderCapabilities().catch((error: unknown) => log.error('Детекция устройства:', error))
+void renderQuality().catch((error: unknown) => log.error('Уровень качества:', error))
 void pingBackground().catch((error: unknown) => log.error('PING не прошёл:', error))
 void scanActiveTab().catch((error: unknown) => log.error('Опрос вкладки не прошёл:', error))
 

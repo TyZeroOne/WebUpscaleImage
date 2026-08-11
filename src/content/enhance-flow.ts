@@ -1,4 +1,6 @@
-import { DEFAULT_QUALITY_LEVEL, resolveScale, resolveTargetSize } from '@/core/enhance'
+import { resolvePlan, resolveScale, resolveTargetSize } from '@/core/enhance'
+import type { QualityLevel } from '@/core/enhance'
+import { getSettings } from '@/core/settings'
 import { createLogger } from '@/core/log'
 import { sendToBackground } from '@/core/messaging'
 import type { EnhanceTrigger } from '@/core/messaging'
@@ -6,6 +8,7 @@ import type { Toaster } from '@/ui/toast'
 import { buildFileName, downloadBlob, replaceOnPage, restoreOriginal } from './apply-result'
 import { isWorkerModeActive, runEnhance } from './enhance-runner'
 import { ImageSourceError, acquireReadableBitmap } from './image-source'
+import { resolveQualityLevel } from './quality'
 import { yieldUntilPainted } from './scheduler'
 
 /**
@@ -48,6 +51,8 @@ export interface EnhanceOutcome {
   durationMs: number
   blob: Blob
   sourceUrl: string
+  /** Заменена ли картинка на странице. Зависит от настройки replaceOnPage. */
+  replaced: boolean
 }
 
 /** Картинки, которые обрабатываются прямо сейчас, — защита от двойного запуска. */
@@ -83,13 +88,17 @@ export function describeFailure(error: unknown): string {
 }
 
 /** Целевой размер — нужен ещё до начала работы, чтобы показать его в UI. */
-export function planEnhance(image: HTMLImageElement): {
-  scale: number
-  width: number
-  height: number
-} {
+export function planEnhance(
+  image: HTMLImageElement,
+  level: QualityLevel,
+): { scale: number; width: number; height: number } {
   const displayWidth = image.getBoundingClientRect().width
-  const scale = resolveScale(displayWidth, image.naturalWidth, window.devicePixelRatio)
+  const scale = resolveScale(
+    displayWidth,
+    image.naturalWidth,
+    window.devicePixelRatio,
+    resolvePlan(level).maxScale,
+  )
   const target = resolveTargetSize(image.naturalWidth, image.naturalHeight, scale)
   return { scale, width: target.width, height: target.height }
 }
@@ -107,7 +116,8 @@ export async function enhanceImageCore(
   inFlight.add(image)
 
   const sourceUrl = image.currentSrc || image.src
-  const { scale } = planEnhance(image)
+  const level = await resolveQualityLevel()
+  const { scale } = planEnhance(image, level)
 
   // Отчёт в service worker. На этапе 2-3 он только пишет в лог: сама работа
   // идёт здесь. На этапе 4 это сообщение станет передачей задачи.
@@ -134,11 +144,7 @@ export async function enhanceImageCore(
     // С этого момента картинкой владеет runEnhance: она либо уедет в воркер
     // вместе с владением, либо будет освобождена там же после вычислений.
     handedOff = true
-    const result = await runEnhance(
-      { bitmap, sourceUrl },
-      { level: DEFAULT_QUALITY_LEVEL, scale },
-      signal,
-    )
+    const result = await runEnhance({ bitmap, sourceUrl }, { level, scale }, signal)
 
     log.info(
       `Готово за ${result.durationMs} мс (${result.backend}, ` +
@@ -147,7 +153,13 @@ export async function enhanceImageCore(
         `${Math.round(result.blob.size / 1024)} КБ`,
     )
 
-    replaceOnPage(image, result.blob)
+    /**
+     * Подмена на странице — настройка, а не данность. Часть пользователей
+     * хочет получить файл, не трогая вид сайта: подменённая картинка может
+     * сломать вёрстку, если сайт рассчитывает на конкретные размеры.
+     */
+    const settings = await getSettings()
+    if (settings.replaceOnPage) replaceOnPage(image, result.blob)
 
     return {
       width: result.width,
@@ -155,6 +167,7 @@ export async function enhanceImageCore(
       durationMs: result.durationMs,
       blob: result.blob,
       sourceUrl,
+      replaced: settings.replaceOnPage,
     }
   } finally {
     /**
@@ -177,7 +190,8 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
     image: HTMLImageElement,
     trigger: EnhanceTrigger,
   ): Promise<void> {
-    const plan = planEnhance(image)
+    const level = await resolveQualityLevel()
+    const plan = planEnhance(image, level)
     const progress = toaster.show(
       `Обрабатываю: ${image.naturalWidth}×${image.naturalHeight} → ${plan.width}×${plan.height}…`,
       { tone: 'progress', durationMs: null },
@@ -202,13 +216,18 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
                   buildFileName(outcome.sourceUrl, outcome.width, outcome.height),
                 ),
             },
-            {
-              label: 'Вернуть',
-              onClick: () => {
-                restoreOriginal(image)
-                progress.dismiss()
-              },
-            },
+            // Возвращать нечего, если подмена на странице выключена настройкой.
+            ...(outcome.replaced
+              ? [
+                  {
+                    label: 'Вернуть',
+                    onClick: () => {
+                      restoreOriginal(image)
+                      progress.dismiss()
+                    },
+                  },
+                ]
+              : []),
           ],
         },
       )

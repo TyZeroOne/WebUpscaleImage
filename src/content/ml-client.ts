@@ -66,6 +66,22 @@ let runtime: Promise<MlRuntime | null> | null = null
  * файлом и берётся сетевым запросом к самому расширению. Встроить его
  * в content.js нельзя: 800 КБ попадали бы в каждую открытую страницу.
  */
+/**
+ * Абсолютный URL ресурса расширения.
+ *
+ * Воркер создан из blob-URL, и его базовый адрес — сам blob. Относительный
+ * путь там не разрешается вообще: fetch падает с «Failed to parse URL».
+ * Обычный chrome.runtime.getURL и так возвращает абсолютный
+ * chrome-extension://-адрес, но полагаться на это не стоит — ошибка вылезла бы
+ * глубоко внутри воркера в виде сообщения, по которому причину не угадать.
+ *
+ * Проверено: с относительным путём модель не грузится, а расширение молча
+ * откатывается на классический апскейл.
+ */
+function absoluteUrl(path: string): string {
+  return new URL(chrome.runtime.getURL(path), location.href).href
+}
+
 async function spawnWorker(): Promise<Worker> {
   const response = await fetch(chrome.runtime.getURL(WORKER_PATH))
   if (!response.ok) throw new Error(`Не удалось загрузить ${WORKER_PATH}: ${response.status}`)
@@ -122,8 +138,8 @@ async function createRuntime(): Promise<MlRuntime | null> {
 
   const init: MlInitRequest = {
     type: 'init',
-    modelUrl: chrome.runtime.getURL(MODEL_PATH),
-    wasmBaseUrl: chrome.runtime.getURL(WASM_PATH),
+    modelUrl: absoluteUrl(MODEL_PATH),
+    wasmBaseUrl: absoluteUrl(WASM_PATH),
     // Решение о бэкенде принимает воркер: он один может достоверно
     // проверить, поднимется ли WebGPU в его собственном контексте.
     preferWebgpu: true,

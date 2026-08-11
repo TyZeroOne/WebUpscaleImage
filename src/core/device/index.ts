@@ -1,3 +1,5 @@
+import type { QualityLevel } from '@/core/enhance/types'
+
 /**
  * Определение возможностей устройства.
  *
@@ -61,6 +63,37 @@ async function detectWebgpu(): Promise<{ available: boolean; adapter: string | n
   } catch {
     return { available: false, adapter: null }
   }
+}
+
+/**
+ * Уровень качества, который устройство потянет без мучений.
+ *
+ * Пороги подобраны по замерам этапа 5, а не по ощущениям:
+ *
+ *  - Есть WebGPU. Инференс модели идёт за доли секунды (1200×900 за 496 мс),
+ *    и «качественно» не создаёт заметного ожидания. Это лучший случай.
+ *
+ *  - Нет WebGPU, но есть SIMD и хотя бы 4 ядра. ML остаётся возможным,
+ *    но на WASM он стоит около 11 мкс на пиксель — картинка 500×500
+ *    считалась бы почти три секунды. Поэтому «сбалансированно»: ML
+ *    не включается, работает фильтр Ланцоша с радиусом 2.
+ *
+ *  - Всё остальное: двухъядерная машина, нет SIMD, меньше 2 ГБ памяти.
+ *    Здесь и Ланцош ощутим (443 мс на картинке 3000×2000), поэтому
+ *    «быстро» — масштабирование средствами браузера.
+ *
+ * Значения намеренно консервативны: заниженный уровень пользователь
+ * при желании поднимет вручную, а завышенный он воспримет как «расширение
+ * тормозит» и, скорее всего, просто его удалит.
+ */
+export function recommendLevel(capabilities: DeviceCapabilities): QualityLevel {
+  if (capabilities.webgpu) return 'quality'
+
+  const enoughCores = capabilities.logicalCores >= 4
+  const enoughMemory = capabilities.memoryGb === null || capabilities.memoryGb >= 4
+
+  if (capabilities.wasmSimd && enoughCores && enoughMemory) return 'balanced'
+  return 'fast'
 }
 
 let cached: Promise<DeviceCapabilities> | null = null

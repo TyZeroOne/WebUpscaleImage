@@ -155,7 +155,51 @@ label.ie-check {
   cursor: pointer;
 }
 
-label.ie-check small {
+label.ie-check small,
+label.ie-choice small {
   display: block;
+  margin-top: 2px;
   color: var(--ie-muted);
+}
+
+h2.ie-section {
+  margin: 22px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ie-muted);
+}
+
+fieldset.ie-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+label.ie-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+label.ie-choice:hover {
+  background: var(--ie-surface);
+}
+
+/* :has поддерживается с Chrome 105, а минимальная версия расширения — 116. */
+label.ie-choice:has(input:checked) {
+  border-color: var(--ie-accent);
+  background: var(--ie-surface);
+}
+
+label.ie-choice input {
+  margin-top: 2px;
 }
