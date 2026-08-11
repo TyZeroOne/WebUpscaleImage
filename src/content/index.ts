@@ -1,12 +1,12 @@
 import { createLogger, setVerboseLogging } from '@/core/log'
 import { registerMessageHandlers, sendToBackground } from '@/core/messaging'
-import type { EnhanceTrigger } from '@/core/messaging'
 import { getSettings } from '@/core/settings'
 import { createHighlight } from '@/ui/highlight'
 import { createOverlayButton } from '@/ui/overlay-button'
 import { createToaster } from '@/ui/toast'
 import { VIDEO_ENHANCEMENT_ENABLED } from '@/video'
 import { findImageBySource, scanMedia } from './detect'
+import { createEnhanceFlow } from './enhance-flow'
 import { createHoverTracker } from './hover'
 import { getUiRoot } from './ui-root'
 
@@ -43,27 +43,12 @@ function bootstrapUi(): void {
     },
   })
 
-  /** Общая точка запроса на улучшение — и для кнопки, и для контекстного меню. */
-  const requestEnhance = async (image: HTMLImageElement, trigger: EnhanceTrigger) => {
-    log.debug(`Запрос на улучшение (${trigger}):`, image.currentSrc || image.src)
-
-    const response = await sendToBackground('ENHANCE_IMAGE', {
-      sourceUrl: image.currentSrc || image.src,
-      naturalWidth: image.naturalWidth,
-      naturalHeight: image.naturalHeight,
-      trigger,
-    })
-
-    if (!response) {
-      toaster.show('Расширение не отвечает. Попробуйте обновить страницу.', 'error')
-      return
-    }
-    toaster.show(response.message, response.accepted ? 'info' : 'error')
-  }
+  /** Общая точка обработки — и для кнопки, и для контекстного меню (DRY). */
+  const enhanceImage = createEnhanceFlow({ toaster })
 
   button.onClick(() => {
     if (!hovered) return
-    void requestEnhance(hovered, 'overlay')
+    void enhanceImage(hovered, 'overlay')
   })
 
   // Контекстное меню приходит из service worker'а: сам пункт меню живёт там,
@@ -74,11 +59,11 @@ function bootstrapUi(): void {
       if (!image) {
         // Реальный случай: картинка внутри iframe, а мы туда не внедряемся,
         // либо страница подменила src между кликом и доставкой сообщения.
-        toaster.show('Не удалось найти эту картинку на странице.', 'error')
+        toaster.show('Не удалось найти эту картинку на странице.', { tone: 'error' })
         return { handled: false }
       }
       highlight.showFor(image.getBoundingClientRect(), HIGHLIGHT_DURATION_MS)
-      await requestEnhance(image, 'context-menu')
+      await enhanceImage(image, 'context-menu')
       return { handled: true }
     },
 

@@ -8,10 +8,27 @@
  * когда пользователь уже ушёл с вкладки.
  */
 
-export type ToastTone = 'info' | 'error'
+export type ToastTone = 'info' | 'progress' | 'error'
 
-/** Сколько тост висит на экране. */
-const DEFAULT_DURATION_MS = 3200
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
+export interface ToastOptions {
+  tone?: ToastTone
+  /** null — не скрывать автоматически (для сообщений о ходе работы). */
+  durationMs?: number | null
+  actions?: ToastAction[]
+}
+
+/** Тост, который можно обновить или убрать после показа. */
+export interface ToastHandle {
+  update(text: string, options?: ToastOptions): void
+  dismiss(): void
+}
+
+const DEFAULT_DURATION_MS = 3600
 
 /**
  * Больше трёх одновременно — уже стена текста, закрывающая контент.
@@ -19,8 +36,11 @@ const DEFAULT_DURATION_MS = 3200
  */
 const MAX_VISIBLE = 3
 
+/** Запас над 160 мс перехода из CSS: узел удаляется, когда анимация закончилась. */
+const REMOVE_DELAY_MS = 200
+
 export interface Toaster {
-  show(text: string, tone?: ToastTone, durationMs?: number): void
+  show(text: string, options?: ToastOptions): ToastHandle
 }
 
 export function createToaster(layer: HTMLElement): Toaster {
@@ -40,25 +60,53 @@ export function createToaster(layer: HTMLElement): Toaster {
     const index = active.indexOf(node)
     if (index >= 0) active.splice(index, 1)
     node.dataset.visible = 'false'
-    // Ждём конца перехода прозрачности, потом убираем из DOM.
-    // 200 мс с запасом больше 160 мс из CSS.
-    setTimeout(() => node.remove(), 200)
+    setTimeout(() => node.remove(), REMOVE_DELAY_MS)
   }
 
   return {
-    show(text, tone = 'info', durationMs = DEFAULT_DURATION_MS) {
+    show(text, options = {}) {
       const toast = document.createElement('div')
       toast.className = 'toast'
-      toast.dataset.tone = tone
       toast.dataset.visible = 'false'
-      // Текст через textContent, а не innerHTML: сюда попадают URL картинок
-      // и сообщения об ошибках со страницы — то есть данные, которым нельзя
-      // доверять. innerHTML здесь был бы XSS внутри нашего же shadow root.
+
       const dot = document.createElement('span')
       dot.className = 'dot'
       const label = document.createElement('span')
-      label.textContent = text
-      toast.append(dot, label)
+      label.className = 'text'
+      const actionsBox = document.createElement('span')
+      actionsBox.className = 'actions'
+      toast.append(dot, label, actionsBox)
+
+      let hideTimer: ReturnType<typeof setTimeout> | undefined
+
+      const applyOptions = (value: string, opts: ToastOptions): void => {
+        // Текст через textContent, а не innerHTML: сюда попадают URL картинок
+        // и сообщения об ошибках со страницы — то есть данные, которым нельзя
+        // доверять. innerHTML здесь был бы XSS внутри нашего же shadow root.
+        label.textContent = value
+        toast.dataset.tone = opts.tone ?? 'info'
+
+        actionsBox.replaceChildren()
+        for (const action of opts.actions ?? []) {
+          const button = document.createElement('button')
+          button.type = 'button'
+          button.textContent = action.label
+          button.addEventListener('click', (event) => {
+            // Та же причина, что и у кнопки-оверлея: событие всплывает
+            // до document, где его видят обработчики страницы.
+            event.preventDefault()
+            event.stopPropagation()
+            action.onClick()
+          })
+          actionsBox.append(button)
+        }
+
+        clearTimeout(hideTimer)
+        const duration = opts.durationMs === undefined ? DEFAULT_DURATION_MS : opts.durationMs
+        if (duration !== null) hideTimer = setTimeout(() => remove(toast), duration)
+      }
+
+      applyOptions(text, options)
       stack.append(toast)
 
       /**
@@ -68,8 +116,7 @@ export function createToaster(layer: HTMLElement): Toaster {
        * посчитает стили один раз, уже с opacity: 1, и перехода не будет.
        *
        * Чтение offsetHeight принудительно вызывает пересчёт стилей и
-       * компоновки прямо сейчас — этого достаточно, чтобы начальное
-       * состояние зафиксировалось.
+       * компоновки прямо сейчас — этого достаточно.
        *
        * Напрашивающаяся альтернатива — двойной requestAnimationFrame —
        * здесь неверна: в невидимой вкладке кадры не отрисовываются, rAF
@@ -87,7 +134,16 @@ export function createToaster(layer: HTMLElement): Toaster {
         remove(oldest)
       }
 
-      setTimeout(() => remove(toast), durationMs)
+      return {
+        update(nextText, nextOptions = {}) {
+          if (!toast.isConnected) return
+          applyOptions(nextText, nextOptions)
+        },
+        dismiss() {
+          clearTimeout(hideTimer)
+          remove(toast)
+        },
+      }
     },
   }
 }

@@ -56,7 +56,9 @@ image-enhancer/
     content/            — content script: детекция картинок/видео, оверлеи и плашки
     workers/            — Web Worker'ы: инференс и классический апскейл (с этапа 4)
     core/
-      enhance/          — общая логика улучшения изображений (интерфейсы + реализации)
+      enhance/          — улучшение изображений: интерфейс, ресемплер Ланцоша, реализация
+                          на OffscreenCanvas. Не знает ни про DOM, ни про chrome API —
+                          готов к переносу в Worker (этап 4)
       device/           — детекция возможностей устройства и выбор уровня качества
       messaging/        — типизированный контракт сообщений между слоями
       settings/         — чтение и запись пользовательских настроек
@@ -122,8 +124,8 @@ image-enhancer/
 |---|------|-----------|------|--------|
 | 0 | Настройка проекта | [01_Stage0_ProjectSetup_Impl.md](01_Stage0_ProjectSetup_Impl.md) | [01_Stage0_ProjectSetup_Guide.md](01_Stage0_ProjectSetup_Guide.md) | ✅ готов |
 | 1 | Детекция и UI-точки входа | [02_Stage1_ImageDetection_Impl.md](02_Stage1_ImageDetection_Impl.md) | [02_Stage1_ImageDetection_Guide.md](02_Stage1_ImageDetection_Guide.md) | ✅ готов |
-| 2 | Классический апскейл, режим «одно изображение» | — | — | следующий |
-| 3 | Режим «вся страница» | — | — | |
+| 2 | Классический апскейл, режим «одно изображение» | [03_Stage2_ClassicUpscale_Impl.md](03_Stage2_ClassicUpscale_Impl.md) | [03_Stage2_ClassicUpscale_Guide.md](03_Stage2_ClassicUpscale_Guide.md) | ✅ готов |
+| 3 | Режим «вся страница» | — | — | следующий |
 | 4 | Вынос вычислений в Web Worker | — | — | |
 | 5 | ML-апскейл | — | — | |
 | 6 | Уровни качества и настройки | — | — | |
@@ -141,8 +143,8 @@ image-enhancer/
 | `content_scripts` на `http(s)://*/*` | ✅ этап 0 | Оверлеи при наведении невозможны без постоянного присутствия на странице |
 | `contextMenus` | ✅ этап 1 | Пункт «Улучшить изображение» по правому клику |
 | `offscreen` | этап 4 | Единственный контекст, где можно создать Web Worker и рисовать на canvas |
-| `host_permissions` | этап 7 | Скачивание картинки в обход CORS, когда canvas «испорчен» (tainted) |
-| `downloads` | этап 2 или 7 | Сохранение результата файлом |
+| `host_permissions` | этап 7 | Загрузка картинки в обход CORS, когда canvas «испорчен» (tainted). На этапе 2 частично решено повторной загрузкой с `crossOrigin` — работает, если сервер отдаёт `Access-Control-Allow-Origin` |
+| `downloads` | **не понадобилось** | Скачивание сделано ссылкой `<a download>`; API расширения потребовало бы отдельного предупреждения при установке |
 | `notifications` | будущий видео-этап | Уведомление о завершении долгой фоновой обработки |
 
 ## Команды

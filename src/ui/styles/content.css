@@ -131,6 +131,10 @@
   background: rgba(120, 26, 26, 0.94);
 }
 
+.toast .text {
+  flex: 1 1 auto;
+}
+
 .toast .dot {
   flex: none;
   width: 6px;
@@ -144,6 +148,48 @@
   background: #f87171;
 }
 
+/* Точка пульсирует, пока идёт работа: единственный индикатор того,
+   что расширение не зависло. Настоящий прогресс появится на этапе 3. */
+.toast[data-tone='progress'] .dot {
+  background: #fbbf24;
+  animation: ie-pulse 1s ease-in-out infinite;
+}
+
+@keyframes ie-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.toast .actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.toast .actions:empty {
+  display: none;
+}
+
+.toast .actions button {
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  /* Родительский .toasts сквозной для мыши — возвращаем реакцию точечно. */
+  pointer-events: auto;
+}
+
+.toast .actions button:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.12);
+}
+
 /*
  * Пользователи, попросившие ОС уменьшить анимацию, не должны видеть
  * наши переходы: расширение появляется поверх контента, и лишнее движение
@@ -154,5 +200,9 @@
   .toast,
   .highlight {
     transition: none;
+  }
+
+  .toast[data-tone='progress'] .dot {
+    animation: none;
   }
 }

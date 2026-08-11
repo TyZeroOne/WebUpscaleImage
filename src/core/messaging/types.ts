@@ -34,8 +34,10 @@ export interface MessageContracts {
 
   /**
    * Пользователь попросил улучшить конкретную картинку.
-   * Этап 1: обработчик только логирует и отвечает отказом с причиной.
-   * Этап 2: здесь начнётся реальный пайплайн.
+   *
+   * Этап 2: сообщение информационное — сама обработка идёт в content script,
+   * а service worker лишь пишет о ней в лог. Этап 4 сделает его настоящей
+   * передачей задачи в offscreen-документ, и форма запроса не изменится.
    */
   ENHANCE_IMAGE: {
     request: {
@@ -44,7 +46,7 @@ export interface MessageContracts {
       naturalHeight: number
       trigger: EnhanceTrigger
     }
-    response: { accepted: boolean; message: string }
+    response: { received: true }
   }
 
   /** Popup спрашивает у вкладки, что на ней есть. Идёт через chrome.tabs.sendMessage. */
