@@ -3,11 +3,13 @@ import { registerMessageHandlers, sendToBackground } from '@/core/messaging'
 import { getSettings } from '@/core/settings'
 import { createHighlight } from '@/ui/highlight'
 import { createOverlayButton } from '@/ui/overlay-button'
+import { createProgressPanel } from '@/ui/progress-panel'
 import { createToaster } from '@/ui/toast'
 import { VIDEO_ENHANCEMENT_ENABLED } from '@/video'
 import { findImageBySource, scanMedia } from './detect'
 import { createEnhanceFlow } from './enhance-flow'
 import { createHoverTracker } from './hover'
+import { createPageFlow } from './page-flow'
 import { getUiRoot } from './ui-root'
 
 /**
@@ -32,6 +34,7 @@ function bootstrapUi(): void {
   const button = createOverlayButton(layer)
   const toaster = createToaster(layer)
   const highlight = createHighlight(layer)
+  const panel = createProgressPanel(layer)
 
   let hovered: HTMLImageElement | null = null
 
@@ -45,6 +48,7 @@ function bootstrapUi(): void {
 
   /** Общая точка обработки — и для кнопки, и для контекстного меню (DRY). */
   const enhanceImage = createEnhanceFlow({ toaster })
+  const enhancePage = createPageFlow({ panel, toaster })
 
   button.onClick(() => {
     if (!hovered) return
@@ -70,6 +74,14 @@ function bootstrapUi(): void {
     SCAN_PAGE: () => {
       const media = scanMedia()
       return { url: location.href, images: media.images.length, videos: media.videos.length }
+    },
+
+    ENHANCE_PAGE: async () => {
+      const result = await enhancePage()
+      if (!result.started && result.reason) {
+        toaster.show(result.reason, { tone: 'error' })
+      }
+      return result
     },
   })
 }

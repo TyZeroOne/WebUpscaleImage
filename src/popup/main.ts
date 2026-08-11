@@ -55,20 +55,43 @@ async function pingBackground(): Promise<void> {
  * chrome.tabs.query без разрешения `tabs` возвращает вкладки, но без url
  * и title. Нам нужен только id, поэтому разрешение не требуется.
  */
-async function scanActiveTab(): Promise<void> {
+async function activeTabId(): Promise<number | undefined> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  if (tab?.id === undefined) return
+  return tab?.id
+}
 
-  const result = await sendToTab(tab.id, 'SCAN_PAGE', {})
+async function scanActiveTab(): Promise<void> {
+  const tabId = await activeTabId()
+  const enhanceButton = document.getElementById('enhance-page') as HTMLButtonElement | null
+
+  const result = tabId === undefined ? null : await sendToTab(tabId, 'SCAN_PAGE', {})
   if (!result) {
     // Штатная ситуация: служебная страница (chrome://, страница настроек,
     // Chrome Web Store), куда content script не внедряется по правилам Chrome.
     setText('page-images', 'нет доступа')
     setText('page-videos', 'нет доступа')
+    if (enhanceButton) enhanceButton.disabled = true
     return
   }
   setText('page-images', String(result.images))
   setText('page-videos', String(result.videos))
+  // Нечего обрабатывать — кнопка не должна выглядеть рабочей.
+  if (enhanceButton) enhanceButton.disabled = result.images === 0
+}
+
+/**
+ * Запуск режима «вся страница».
+ *
+ * Popup закрывается сразу после отправки: он уничтожается при любом клике
+ * вне себя, и держать его открытым на всё время обработки невозможно.
+ * Прогресс показывает панель на самой странице — она переживёт и закрытие
+ * popup, и переключение вкладок.
+ */
+async function startPageEnhance(): Promise<void> {
+  const tabId = await activeTabId()
+  if (tabId === undefined) return
+  await sendToTab(tabId, 'ENHANCE_PAGE', {})
+  window.close()
 }
 
 setText('version', `v${chrome.runtime.getManifest().version}`)
@@ -78,4 +101,8 @@ void scanActiveTab().catch((error: unknown) => log.error('Опрос вклад�
 
 document.getElementById('open-options')?.addEventListener('click', () => {
   void chrome.runtime.openOptionsPage()
+})
+
+document.getElementById('enhance-page')?.addEventListener('click', () => {
+  void startPageEnhance().catch((error: unknown) => log.error('Запуск не удался:', error))
 })

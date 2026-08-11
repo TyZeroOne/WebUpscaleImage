@@ -131,6 +131,23 @@ button:hover {
   border-color: var(--ie-accent);
 }
 
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+button.ie-primary {
+  flex: 1;
+  border-color: transparent;
+  background: var(--ie-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.ie-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
 label.ie-check {
   display: flex;
   align-items: flex-start;

@@ -33,6 +33,9 @@
   классический апскейл и ML — это два разных бэкенда одного контракта).
 - **Минимум работы в UI-потоке.** Content script имеет право искать картинки и рисовать
   оверлеи. Считать пиксели он права не имеет — это заморозит сайт пользователя.
+  На этапах 2–3 это правило временно нарушено осознанно: сначала нужен работающий
+  проверенный алгоритм, и только потом перенос в Worker (этап 4). Цена нарушения
+  измерена и записана в документации обоих этапов.
 - **Явные типизированные интерфейсы между слоями.** Общение
   `content script -> service worker -> offscreen -> worker` идёт через одну карту сообщений
   (`core/messaging/types.ts`), а не через россыпь объектов с полем `type: string`.
@@ -125,8 +128,8 @@ image-enhancer/
 | 0 | Настройка проекта | [01_Stage0_ProjectSetup_Impl.md](01_Stage0_ProjectSetup_Impl.md) | [01_Stage0_ProjectSetup_Guide.md](01_Stage0_ProjectSetup_Guide.md) | ✅ готов |
 | 1 | Детекция и UI-точки входа | [02_Stage1_ImageDetection_Impl.md](02_Stage1_ImageDetection_Impl.md) | [02_Stage1_ImageDetection_Guide.md](02_Stage1_ImageDetection_Guide.md) | ✅ готов |
 | 2 | Классический апскейл, режим «одно изображение» | [03_Stage2_ClassicUpscale_Impl.md](03_Stage2_ClassicUpscale_Impl.md) | [03_Stage2_ClassicUpscale_Guide.md](03_Stage2_ClassicUpscale_Guide.md) | ✅ готов |
-| 3 | Режим «вся страница» | — | — | следующий |
-| 4 | Вынос вычислений в Web Worker | — | — | |
+| 3 | Режим «вся страница» | [04_Stage3_PageMode_Impl.md](04_Stage3_PageMode_Impl.md) | [04_Stage3_PageMode_Guide.md](04_Stage3_PageMode_Guide.md) | ✅ готов |
+| 4 | Вынос вычислений в Web Worker | — | — | следующий |
 | 5 | ML-апскейл | — | — | |
 | 6 | Уровни качества и настройки | — | — | |
 | 7 | Устойчивость: CORS и ошибки | — | — | |

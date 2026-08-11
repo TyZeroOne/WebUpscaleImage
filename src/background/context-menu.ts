@@ -14,7 +14,8 @@ import { sendToTab } from '@/core/messaging'
 
 const log = createLogger('context-menu')
 
-const MENU_ID = 'image-enhancer:enhance-image'
+const MENU_IMAGE_ID = 'image-enhancer:enhance-image'
+const MENU_PAGE_ID = 'image-enhancer:enhance-page'
 
 export function registerContextMenu(): void {
   /**
@@ -33,11 +34,21 @@ export function registerContextMenu(): void {
     // пункт с тем же id уже зарегистрирован браузером.
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({
-        id: MENU_ID,
+        id: MENU_IMAGE_ID,
         title: 'Улучшить это изображение',
         // contexts: ['image'] — пункт показывается только по правому клику
         // на <img>. Chrome при этом кладёт в info.srcUrl адрес картинки.
         contexts: ['image'],
+      })
+      /**
+       * Второй пункт — на пустом месте страницы. Контекст 'page' означает
+       * «правый клик не по картинке, ссылке, выделению или полю ввода»,
+       * поэтому два наших пункта никогда не появятся в меню одновременно.
+       */
+      chrome.contextMenus.create({
+        id: MENU_PAGE_ID,
+        title: 'Улучшить все изображения на странице',
+        contexts: ['page'],
       })
     })
   })
@@ -45,12 +56,22 @@ export function registerContextMenu(): void {
   // А вот слушатель регистрируется при каждом подъёме worker'а, синхронно:
   // без него клик по пункту меню будет некому обработать.
   chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (info.menuItemId !== MENU_ID) return
+    if (info.menuItemId !== MENU_IMAGE_ID && info.menuItemId !== MENU_PAGE_ID) return
 
     if (tab?.id === undefined) {
       log.warn('Клик по пункту меню без вкладки — игнорирую')
       return
     }
+
+    if (info.menuItemId === MENU_PAGE_ID) {
+      void sendToTab(tab.id, 'ENHANCE_PAGE', {}).then((response) => {
+        if (response && !response.started) {
+          log.warn(`Режим «вся страница» не запустился: ${response.reason ?? 'причина неизвестна'}`)
+        }
+      })
+      return
+    }
+
     if (!info.srcUrl) {
       log.warn('В событии нет srcUrl — игнорирую')
       return

@@ -190,6 +190,103 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* ------------------------------------------- панель хода обработки страницы */
+
+/*
+ * Левый нижний угол — чтобы не перекрываться с тостами справа.
+ * Прогресс должен оставаться виден, даже когда всплывает ошибка
+ * по отдельной картинке.
+ */
+.panel {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(20, 22, 28, 0.94);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font: 400 12px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.panel[data-visible='false'] {
+  /* Скрытая панель не должна ловить клики, пока идёт анимация исчезновения. */
+  pointer-events: none;
+}
+
+.panel[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+.panel-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.panel-bar {
+  height: 4px;
+  margin: 10px 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+
+.panel-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: #4f7df3;
+  transition: width 200ms ease;
+}
+
+.panel[data-state='done'] .panel-bar i {
+  background: #4ade80;
+}
+
+.panel[data-state='cancelled'] .panel-bar i {
+  background: #9aa0a6;
+}
+
+.panel-status {
+  color: rgba(255, 255, 255, 0.72);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.panel-actions button {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.panel-actions button:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.panel-actions button[hidden] {
+  display: none;
+}
+
 /*
  * Пользователи, попросившие ОС уменьшить анимацию, не должны видеть
  * наши переходы: расширение появляется поверх контента, и лишнее движение
@@ -198,7 +295,9 @@
 @media (prefers-reduced-motion: reduce) {
   .button,
   .toast,
-  .highlight {
+  .highlight,
+  .panel,
+  .panel-bar i {
     transition: none;
   }
 

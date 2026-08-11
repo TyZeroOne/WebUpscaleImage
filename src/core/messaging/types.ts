@@ -13,7 +13,7 @@
 export const MESSAGE_SOURCE = 'image-enhancer'
 
 /** Откуда пришёл запрос на улучшение — влияет на то, как показывать результат. */
-export type EnhanceTrigger = 'overlay' | 'context-menu'
+export type EnhanceTrigger = 'overlay' | 'context-menu' | 'page'
 
 /**
  * Единственное место, куда добавляются новые типы сообщений.
@@ -59,6 +59,18 @@ export interface MessageContracts {
   CONTEXT_MENU_ENHANCE: {
     request: { srcUrl: string }
     response: { handled: boolean }
+  }
+
+  /**
+   * Запуск режима «вся страница». Приходит из popup или из контекстного меню.
+   *
+   * Ответ возвращается СРАЗУ, до окончания работы: очередь может выполняться
+   * минутами, а popup закрывается через доли секунды после клика — ждать
+   * завершения было бы некому.
+   */
+  ENHANCE_PAGE: {
+    request: Record<string, never>
+    response: { started: boolean; total: number; reason?: string }
   }
 }
 
