@@ -1,3 +1,5 @@
+import { t } from '@/core/i18n'
+
 /**
  * Кнопка «Улучшить», всплывающая над картинкой при наведении.
  *
@@ -38,8 +40,14 @@ export function createOverlayButton(layer: HTMLElement): OverlayButton {
   button.className = 'button'
   button.type = 'button'
   button.dataset.visible = 'false'
-  button.setAttribute('aria-label', 'Улучшить это изображение')
-  button.innerHTML = `${ICON_SVG}<span class="label">Улучшить</span>`
+  button.setAttribute('aria-label', t('overlayEnhanceAria'))
+  // innerHTML только для собственной константы с иконкой; подпись —
+  // отдельным узлом через textContent, потому что приходит из локализации.
+  button.innerHTML = ICON_SVG
+  const label = document.createElement('span')
+  label.className = 'label'
+  label.textContent = t('overlayEnhance')
+  button.append(label)
   layer.append(button)
 
   return {

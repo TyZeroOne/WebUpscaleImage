@@ -1,6 +1,7 @@
 import { resolvePlan, resolveScale, resolveTargetSize } from '@/core/enhance'
 import type { QualityLevel } from '@/core/enhance'
 import { getSettings } from '@/core/settings'
+import { t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import { sendToBackground } from '@/core/messaging'
 import type { EnhanceTrigger } from '@/core/messaging'
@@ -77,29 +78,29 @@ export class AlreadyRunningError extends Error {
  * объясняет, почему обработка не нужна, а не притворяется ошибкой.
  */
 export function describeFailure(error: unknown): string {
-  if (error instanceof AlreadyRunningError) return 'Эта картинка уже обрабатывается.'
+  if (error instanceof AlreadyRunningError) return t('errAlreadyRunning')
   if (error instanceof ImageSourceError) {
     switch (error.reason) {
       case 'not-loaded':
-        return 'Картинка ещё не загрузилась. Попробуйте ещё раз.'
+        return t('errNotLoaded')
       case 'tainted':
-        return 'Сайт закрыл доступ к этой картинке, и загрузить её напрямую тоже не вышло.'
+        return t('errTainted')
       case 'decode-failed':
-        return 'Не удалось прочитать эту картинку — возможно, файл повреждён.'
+        return t('errDecode')
       case 'unsupported-format':
-        return 'Это векторная картинка: она и так рисуется чётко в любом размере.'
+        return t('errVector')
       case 'too-large':
-        return 'Картинка слишком большая — обработка не поместится в память.'
+        return t('errTooLarge')
     }
   }
   if (error instanceof DOMException && error.name === 'AbortError') {
-    return 'Обработка отменена.'
+    return t('errAborted')
   }
   if (error instanceof RangeError) {
     // Типичный случай: не хватило памяти на буферы для очень большой картинки.
-    return 'Не хватило памяти. Попробуйте уровень «быстро» в настройках.'
+    return t('errOutOfMemory')
   }
-  return 'Не удалось обработать картинку.'
+  return t('errGeneric')
 }
 
 /** Целевой размер — нужен ещё до начала работы, чтобы показать его в UI. */
@@ -208,7 +209,11 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
     const level = await resolveQualityLevel()
     const plan = planEnhance(image, level)
     const progress = toaster.show(
-      `Обрабатываю: ${image.naturalWidth}×${image.naturalHeight} → ${plan.width}×${plan.height}…`,
+      t(
+        'toastProcessing',
+        `${image.naturalWidth}×${image.naturalHeight}`,
+        `${plan.width}×${plan.height}`,
+      ),
       { tone: 'progress', durationMs: null },
     )
 
@@ -217,14 +222,19 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
       const sizeMb = outcome.blob.size / 1024 / 1024
 
       progress.update(
-        `Готово: ${outcome.width}×${outcome.height}, ${sizeMb.toFixed(1)} МБ, ${outcome.durationMs} мс.`,
+        t(
+          'toastDone',
+          `${outcome.width}×${outcome.height}`,
+          sizeMb.toFixed(1),
+          String(outcome.durationMs),
+        ),
         {
           tone: 'info',
           // Дольше обычного: у тоста есть кнопки, и их надо успеть нажать.
           durationMs: 12_000,
           actions: [
             {
-              label: 'Скачать',
+              label: t('actionDownload'),
               onClick: () =>
                 downloadBlob(
                   outcome.blob,
@@ -235,7 +245,7 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
             ...(outcome.replaced
               ? [
                   {
-                    label: 'Вернуть',
+                    label: t('actionRestore'),
                     onClick: () => {
                       restoreOriginal(image)
                       progress.dismiss()

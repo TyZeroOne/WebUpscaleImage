@@ -1,3 +1,4 @@
+import { t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import { sendToTab } from '@/core/messaging'
 
@@ -35,7 +36,7 @@ export function registerContextMenu(): void {
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({
         id: MENU_IMAGE_ID,
-        title: 'Улучшить это изображение',
+        title: t('menuEnhanceImage'),
         // contexts: ['image'] — пункт показывается только по правому клику
         // на <img>. Chrome при этом кладёт в info.srcUrl адрес картинки.
         contexts: ['image'],
@@ -47,7 +48,7 @@ export function registerContextMenu(): void {
        */
       chrome.contextMenus.create({
         id: MENU_PAGE_ID,
-        title: 'Улучшить все изображения на странице',
+        title: t('menuEnhancePage'),
         contexts: ['page'],
       })
     })

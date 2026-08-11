@@ -2,40 +2,35 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <title>ImageEnhancer</title>
+    <title data-i18n="actionTitle">ImageEnhancer</title>
     <script type="module" src="/src/popup/main.ts"></script>
   </head>
   <body style="width: 320px">
     <header class="ie-header">
       <img src="/icons/icon48.png" alt="" />
-      <h1>ImageEnhancer</h1>
+      <h1 data-i18n="actionTitle">ImageEnhancer</h1>
       <span class="ie-version" id="version">—</span>
     </header>
 
     <ul class="ie-rows">
-      <li><dfn>Уровень качества</dfn><b id="quality">—</b></li>
-      <li><dfn>Изображений на странице</dfn><b id="page-images">—</b></li>
-      <li><dfn>Видео на странице</dfn><b id="page-videos">—</b></li>
-      <li><dfn>Service worker</dfn><b id="sw">проверяю…</b></li>
-      <li><dfn>WebGPU</dfn><b id="webgpu">—</b></li>
-      <li><dfn>WASM SIMD</dfn><b id="wasm-simd">—</b></li>
-      <li><dfn>OffscreenCanvas</dfn><b id="offscreen">—</b></li>
-      <li><dfn>createImageBitmap</dfn><b id="bitmap">—</b></li>
-      <li><dfn>Ядер CPU</dfn><b id="cores">—</b></li>
-      <li><dfn>Память</dfn><b id="memory">—</b></li>
+      <li><dfn data-i18n="popupQuality"></dfn><b id="quality">—</b></li>
+      <li><dfn data-i18n="popupImages"></dfn><b id="page-images">—</b></li>
+      <li><dfn data-i18n="popupVideos"></dfn><b id="page-videos">—</b></li>
+      <li><dfn data-i18n="popupServiceWorker"></dfn><b id="sw" data-i18n="popupChecking"></b></li>
+      <li><dfn data-i18n="capWebgpu"></dfn><b id="webgpu">—</b></li>
+      <li><dfn data-i18n="capWasmSimd"></dfn><b id="wasm-simd">—</b></li>
+      <li><dfn data-i18n="capCores"></dfn><b id="cores">—</b></li>
+      <li><dfn data-i18n="capMemory"></dfn><b id="memory">—</b></li>
     </ul>
 
     <div class="ie-actions">
-      <button id="enhance-page" type="button" class="ie-primary">Улучшить все на странице</button>
+      <button id="enhance-page" type="button" class="ie-primary" data-i18n="popupEnhancePage"></button>
     </div>
 
-    <p class="ie-note">
-      Отдельную картинку можно улучшить, наведя на неё курсор, или через контекстное меню
-      по правому клику.
-    </p>
+    <p class="ie-note" data-i18n="popupNote"></p>
 
     <div class="ie-actions">
-      <button id="open-options" type="button">Настройки</button>
+      <button id="open-options" type="button" data-i18n="popupSettings"></button>
     </div>
   </body>
 </html>

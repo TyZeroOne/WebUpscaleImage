@@ -1,3 +1,4 @@
+import { t } from '@/core/i18n'
 import { createLogger, setVerboseLogging } from '@/core/log'
 import { registerMessageHandlers, sendToBackground } from '@/core/messaging'
 import { getSettings } from '@/core/settings'
@@ -71,7 +72,7 @@ function bootstrapUi(): void {
       if (!image) {
         // Реальный случай: картинка внутри iframe, а мы туда не внедряемся,
         // либо страница подменила src между кликом и доставкой сообщения.
-        toaster.show('Не удалось найти эту картинку на странице.', { tone: 'error' })
+        toaster.show(t('errImageNotFound'), { tone: 'error' })
         return { handled: false }
       }
       highlight.showFor(image.getBoundingClientRect(), HIGHLIGHT_DURATION_MS)

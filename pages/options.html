@@ -2,70 +2,61 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <title>ImageEnhancer — настройки</title>
+    <title data-i18n="optionsTitle">ImageEnhancer</title>
     <script type="module" src="/src/options/main.ts"></script>
   </head>
   <body style="max-width: 640px; margin: 0 auto">
     <header class="ie-header">
       <img src="/icons/icon48.png" alt="" />
-      <h1>ImageEnhancer — настройки</h1>
+      <h1 data-i18n="optionsTitle"></h1>
       <span class="ie-version" id="version">—</span>
     </header>
 
-    <h2 class="ie-section">Уровень качества</h2>
+    <h2 class="ie-section" data-i18n="sectionQuality"></h2>
 
     <fieldset class="ie-choices" id="quality">
       <label class="ie-choice">
         <input type="radio" name="quality" value="auto" />
         <span>
-          <b>Автоматически</b>
-          <small id="auto-hint">Расширение выберет уровень по возможностям устройства.</small>
+          <b data-i18n="levelAuto"></b>
+          <small id="auto-hint" data-i18n="levelAutoHint"></small>
         </span>
       </label>
 
       <label class="ie-choice">
         <input type="radio" name="quality" value="fast" />
         <span>
-          <b>Быстро</b>
-          <small>
-            Масштабирование средствами браузера. Единицы миллисекунд, результат мягкий.
-            Подходит для слабых машин и очень больших изображений.
-          </small>
+          <b data-i18n="levelFast"></b>
+          <small data-i18n="levelFastHint"></small>
         </span>
       </label>
 
       <label class="ie-choice">
         <input type="radio" name="quality" value="balanced" />
         <span>
-          <b>Сбалансированно</b>
-          <small>
-            Фильтр Ланцоша (радиус 2). Нейросеть — только при работающем WebGPU,
-            иначе она была бы слишком медленной для этого уровня.
-          </small>
+          <b data-i18n="levelBalanced"></b>
+          <small data-i18n="levelBalancedHint"></small>
         </span>
       </label>
 
       <label class="ie-choice">
         <input type="radio" name="quality" value="quality" />
         <span>
-          <b>Качественно</b>
-          <small>
-            Нейросеть везде, где она применима, иначе фильтр Ланцоша (радиус 3).
-            На машинах без WebGPU обработка занимает секунды.
-          </small>
+          <b data-i18n="levelQuality"></b>
+          <small data-i18n="levelQualityHint"></small>
         </span>
       </label>
     </fieldset>
 
-    <h2 class="ie-section">Поведение</h2>
+    <h2 class="ie-section" data-i18n="sectionBehavior"></h2>
 
     <ul class="ie-rows">
       <li>
         <label class="ie-check">
           <input type="checkbox" id="replace-on-page" />
           <span>
-            Подменять картинку прямо на странице
-            <small>Если выключить, результат можно будет только скачать.</small>
+            <span data-i18n="optReplaceOnPage"></span>
+            <small data-i18n="optReplaceOnPageHint"></small>
           </span>
         </label>
         <b class="save-state"></b>
@@ -74,25 +65,25 @@
         <label class="ie-check">
           <input type="checkbox" id="verbose-logging" />
           <span>
-            Подробные логи в консоли
-            <small>Пригодится, если нужно понять, почему картинка не обработалась.</small>
+            <span data-i18n="optVerboseLogging"></span>
+            <small data-i18n="optVerboseLoggingHint"></small>
           </span>
         </label>
         <b class="save-state"></b>
       </li>
     </ul>
 
-    <h2 class="ie-section">Это устройство</h2>
+    <h2 class="ie-section" data-i18n="sectionDevice"></h2>
 
     <ul class="ie-rows">
-      <li><dfn>WebGPU</dfn><b id="cap-webgpu">—</b></li>
-      <li><dfn>WASM SIMD</dfn><b id="cap-simd">—</b></li>
-      <li><dfn>Ядер CPU</dfn><b id="cap-cores">—</b></li>
-      <li><dfn>Память</dfn><b id="cap-memory">—</b></li>
+      <li><dfn data-i18n="capWebgpu"></dfn><b id="cap-webgpu">—</b></li>
+      <li><dfn data-i18n="capWasmSimd"></dfn><b id="cap-simd">—</b></li>
+      <li><dfn data-i18n="capCores"></dfn><b id="cap-cores">—</b></li>
+      <li><dfn data-i18n="capMemory"></dfn><b id="cap-memory">—</b></li>
     </ul>
 
-    <p class="ie-note">
-      Все вычисления выполняются на этом устройстве. Изображения никуда не отправляются.
-    </p>
+    <h2 class="ie-section" data-i18n="sectionPrivacy"></h2>
+
+    <p class="ie-note" data-i18n="privacyText"></p>
   </body>
 </html>

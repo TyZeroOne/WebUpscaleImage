@@ -1,3 +1,4 @@
+import { t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import type { ProgressPanel } from '@/ui/progress-panel'
 import type { Toaster } from '@/ui/toast'
@@ -77,12 +78,12 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
       if (restoreOriginal(image)) restored += 1
     }
     processed = []
-    toaster.show(`Восстановлено картинок: ${restored}.`)
+    toaster.show(t('pageRestored', restored))
   })
 
   return async function enhancePage(): Promise<PageFlowStartResult> {
     if (controller) {
-      return { started: false, total: 0, reason: 'Обработка страницы уже идёт.' }
+      return { started: false, total: 0, reason: t('pageBusy') }
     }
 
     /**
@@ -102,7 +103,7 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
       .sort(byViewportPriority)
 
     if (candidates.length === 0) {
-      return { started: false, total: 0, reason: 'Подходящих картинок не найдено.' }
+      return { started: false, total: 0, reason: t('pageNoImages') }
     }
 
     const batch = candidates.slice(0, MAX_BATCH_SIZE)
@@ -113,9 +114,7 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
     panel.show(batch.length)
 
     if (skipped > 0) {
-      toaster.show(
-        `Картинок больше, чем можно обработать за раз. Взяты первые ${batch.length}, пропущено ${skipped}.`,
-      )
+      toaster.show(t('pageBatchTrimmed', batch.length, skipped))
     }
 
     // Запуск не ожидается: вызывающая сторона должна получить ответ сразу,
@@ -152,7 +151,7 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
        * не сообщили бы ничего сверх одного.
        */
       for (const [reason, count] of failures) {
-        toaster.show(count > 1 ? `${reason} (картинок: ${count})` : reason, { tone: 'error' })
+        toaster.show(count > 1 ? t('failureGrouped', reason, count) : reason, { tone: 'error' })
       }
 
       log.info(

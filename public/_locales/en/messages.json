@@ -1,0 +1,161 @@
+{
+  "extName": { "message": "ImageEnhancer" },
+  "extDescription": {
+    "message": "Upscale images right on the page. Runs locally — your images are never uploaded."
+  },
+
+  "actionTitle": { "message": "ImageEnhancer" },
+  "menuEnhanceImage": { "message": "Enhance this image" },
+  "menuEnhancePage": { "message": "Enhance all images on this page" },
+
+  "overlayEnhance": { "message": "Enhance" },
+  "overlayEnhanceAria": { "message": "Enhance this image" },
+  "videoBadge": { "message": "Video — coming soon" },
+
+  "toastProcessing": {
+    "message": "Processing: $SRC$ → $DST$…",
+    "placeholders": {
+      "src": { "content": "$1", "example": "1920×1080" },
+      "dst": { "content": "$2", "example": "3840×2160" }
+    }
+  },
+  "toastDone": {
+    "message": "Done: $SIZE$, $MB$ MB, $MS$ ms.",
+    "placeholders": {
+      "size": { "content": "$1", "example": "3840×2160" },
+      "mb": { "content": "$2", "example": "4.2" },
+      "ms": { "content": "$3", "example": "253" }
+    }
+  },
+  "actionDownload": { "message": "Download" },
+  "actionRestore": { "message": "Undo" },
+  "actionRestoreAll": { "message": "Undo all" },
+  "actionCancel": { "message": "Cancel" },
+  "actionClose": { "message": "Close" },
+
+  "errAlreadyRunning": { "message": "This image is already being processed." },
+  "errNotLoaded": { "message": "The image hasn't loaded yet. Try again." },
+  "errTainted": {
+    "message": "The site blocks access to this image, and downloading it directly didn't work either."
+  },
+  "errDecode": { "message": "Couldn't read this image — the file may be damaged." },
+  "errVector": { "message": "This is a vector image: it already renders sharply at any size." },
+  "errTooLarge": { "message": "This image is too large — processing wouldn't fit in memory." },
+  "errAborted": { "message": "Processing cancelled." },
+  "errOutOfMemory": { "message": "Out of memory. Try the \"fast\" level in settings." },
+  "errGeneric": { "message": "Couldn't process this image." },
+  "errImageNotFound": { "message": "Couldn't find that image on the page." },
+
+  "pageBusy": { "message": "This page is already being processed." },
+  "pageNoImages": { "message": "No suitable images found." },
+  "pageBatchTrimmed": {
+    "message": "Too many images for one run. Took the first $TAKEN$, skipped $SKIPPED$.",
+    "placeholders": {
+      "taken": { "content": "$1", "example": "50" },
+      "skipped": { "content": "$2", "example": "12" }
+    }
+  },
+  "pageRestored": {
+    "message": "Images restored: $COUNT$.",
+    "placeholders": { "count": { "content": "$1", "example": "13" } }
+  },
+  "failureGrouped": {
+    "message": "$REASON$ ($COUNT$ images)",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "count": { "content": "$2", "example": "7" }
+    }
+  },
+
+  "panelRunning": { "message": "Enhancing images" },
+  "panelDone": { "message": "Done" },
+  "panelCancelled": { "message": "Processing stopped" },
+  "panelProgress": {
+    "message": "$DONE$ of $TOTAL$",
+    "placeholders": {
+      "done": { "content": "$1", "example": "12" },
+      "total": { "content": "$2", "example": "40" }
+    }
+  },
+  "panelProgressSkipped": {
+    "message": "$DONE$ of $TOTAL$ · skipped: $FAILED$",
+    "placeholders": {
+      "done": { "content": "$1", "example": "12" },
+      "total": { "content": "$2", "example": "40" },
+      "failed": { "content": "$3", "example": "2" }
+    }
+  },
+
+  "popupEnhancePage": { "message": "Enhance all on this page" },
+  "popupSettings": { "message": "Settings" },
+  "popupQuality": { "message": "Quality level" },
+  "popupImages": { "message": "Images on page" },
+  "popupVideos": { "message": "Videos on page" },
+  "popupServiceWorker": { "message": "Service worker" },
+  "popupNote": {
+    "message": "To enhance a single image, hover over it or use the right-click menu."
+  },
+  "popupChecking": { "message": "checking…" },
+  "popupNoAccess": { "message": "no access" },
+  "popupSwOk": {
+    "message": "responding ($MS$ ms)",
+    "placeholders": { "ms": { "content": "$1", "example": "3" } }
+  },
+  "popupSwFail": { "message": "not responding" },
+
+  "optionsTitle": { "message": "ImageEnhancer — settings" },
+  "sectionQuality": { "message": "Quality level" },
+  "sectionBehavior": { "message": "Behaviour" },
+  "sectionDevice": { "message": "This device" },
+  "sectionPrivacy": { "message": "Privacy" },
+
+  "levelAuto": { "message": "Automatic" },
+  "levelAutoHint": { "message": "The extension picks a level based on your device." },
+  "levelAutoResolved": {
+    "message": "On this device — \"$LEVEL$\".",
+    "placeholders": { "level": { "content": "$1", "example": "best quality" } }
+  },
+  "levelFast": { "message": "Fast" },
+  "levelFastHint": {
+    "message": "Browser-native scaling. A few milliseconds, softer result. Good for slow machines and very large images."
+  },
+  "levelBalanced": { "message": "Balanced" },
+  "levelBalancedHint": {
+    "message": "Lanczos filter. The neural network runs only when WebGPU is available — otherwise it would be too slow for this level."
+  },
+  "levelQuality": { "message": "Best quality" },
+  "levelQualityHint": {
+    "message": "Neural network wherever it applies, otherwise a wider Lanczos filter. Without WebGPU this takes seconds."
+  },
+  "levelNameFast": { "message": "fast" },
+  "levelNameBalanced": { "message": "balanced" },
+  "levelNameQuality": { "message": "best quality" },
+  "levelAutoSuffix": {
+    "message": "$LEVEL$ (auto)",
+    "placeholders": { "level": { "content": "$1", "example": "best quality" } }
+  },
+
+  "optReplaceOnPage": { "message": "Replace the image on the page" },
+  "optReplaceOnPageHint": { "message": "If off, the result can only be downloaded." },
+  "optVerboseLogging": { "message": "Verbose console logging" },
+  "optVerboseLoggingHint": {
+    "message": "Useful for figuring out why an image wasn't processed."
+  },
+  "optSaved": { "message": "saved" },
+
+  "capWebgpu": { "message": "WebGPU" },
+  "capWasmSimd": { "message": "WASM SIMD" },
+  "capCores": { "message": "CPU cores" },
+  "capMemory": { "message": "Memory" },
+  "capYes": { "message": "available" },
+  "capNo": { "message": "unavailable" },
+  "capUnknown": { "message": "unknown" },
+  "capMemoryValue": {
+    "message": "$GB$ GB",
+    "placeholders": { "gb": { "content": "$1", "example": "8" } }
+  },
+
+  "privacyText": {
+    "message": "All processing happens on this device. Images are never uploaded, and the extension collects no analytics. Access to all sites is needed for exactly one thing: downloading an image you explicitly picked, when the page blocks access to it."
+  }
+}

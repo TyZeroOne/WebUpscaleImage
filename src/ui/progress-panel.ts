@@ -1,3 +1,5 @@
+import { t } from '@/core/i18n'
+
 /**
  * Панель хода обработки для режима «вся страница».
  *
@@ -54,16 +56,16 @@ export function createProgressPanel(layer: HTMLElement): ProgressPanel {
 
   const cancelButton = document.createElement('button')
   cancelButton.type = 'button'
-  cancelButton.textContent = 'Отмена'
+  cancelButton.textContent = t('actionCancel')
 
   const restoreButton = document.createElement('button')
   restoreButton.type = 'button'
-  restoreButton.textContent = 'Вернуть все'
+  restoreButton.textContent = t('actionRestoreAll')
   restoreButton.hidden = true
 
   const closeButton = document.createElement('button')
   closeButton.type = 'button'
-  closeButton.textContent = 'Закрыть'
+  closeButton.textContent = t('actionClose')
   closeButton.hidden = true
 
   actions.append(cancelButton, restoreButton, closeButton)
@@ -93,14 +95,14 @@ export function createProgressPanel(layer: HTMLElement): ProgressPanel {
     fill.style.width = `${percent}%`
     status.textContent =
       state.failed > 0
-        ? `${processed} из ${state.total} · пропущено: ${state.failed}`
-        : `${processed} из ${state.total}`
+        ? t('panelProgressSkipped', processed, state.total, state.failed)
+        : t('panelProgress', processed, state.total)
   }
 
   return {
     show(total) {
       clearTimeout(lingerTimer)
-      title.textContent = 'Улучшаю изображения'
+      title.textContent = t('panelRunning')
       cancelButton.hidden = false
       restoreButton.hidden = true
       closeButton.hidden = true
@@ -114,7 +116,7 @@ export function createProgressPanel(layer: HTMLElement): ProgressPanel {
     finish(state) {
       renderProgress(state)
       panel.dataset.state = state.cancelled ? 'cancelled' : 'done'
-      title.textContent = state.cancelled ? 'Обработка остановлена' : 'Готово'
+      title.textContent = state.cancelled ? t('panelCancelled') : t('panelDone')
       cancelButton.hidden = true
       // Возвращать нечего, если ни одна картинка не заменилась.
       restoreButton.hidden = state.done === 0

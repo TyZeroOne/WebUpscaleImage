@@ -1,3 +1,5 @@
+import { t } from '@/core/i18n'
+
 /**
  * Плашка над видео.
  *
@@ -37,7 +39,11 @@ export function createVideoBadge(layer: HTMLElement, interactive: boolean): Vide
   const badge = document.createElement('div')
   badge.className = 'badge'
   badge.dataset.visible = 'false'
-  badge.innerHTML = `${ICON_SVG}<span class="label">Видео — скоро</span>`
+  badge.innerHTML = ICON_SVG
+  const label = document.createElement('span')
+  label.className = 'label'
+  label.textContent = t('videoBadge')
+  badge.append(label)
 
   /**
    * pointer-events остаётся выключенным, пока плашка неинтерактивна.

@@ -1,0 +1,161 @@
+{
+  "extName": { "message": "ImageEnhancer" },
+  "extDescription": {
+    "message": "Улучшение качества изображений прямо на странице. Работает локально, без отправки картинок на сервер."
+  },
+
+  "actionTitle": { "message": "ImageEnhancer" },
+  "menuEnhanceImage": { "message": "Улучшить это изображение" },
+  "menuEnhancePage": { "message": "Улучшить все изображения на странице" },
+
+  "overlayEnhance": { "message": "Улучшить" },
+  "overlayEnhanceAria": { "message": "Улучшить это изображение" },
+  "videoBadge": { "message": "Видео — скоро" },
+
+  "toastProcessing": {
+    "message": "Обрабатываю: $SRC$ → $DST$…",
+    "placeholders": {
+      "src": { "content": "$1", "example": "1920×1080" },
+      "dst": { "content": "$2", "example": "3840×2160" }
+    }
+  },
+  "toastDone": {
+    "message": "Готово: $SIZE$, $MB$ МБ, $MS$ мс.",
+    "placeholders": {
+      "size": { "content": "$1", "example": "3840×2160" },
+      "mb": { "content": "$2", "example": "4.2" },
+      "ms": { "content": "$3", "example": "253" }
+    }
+  },
+  "actionDownload": { "message": "Скачать" },
+  "actionRestore": { "message": "Вернуть" },
+  "actionRestoreAll": { "message": "Вернуть все" },
+  "actionCancel": { "message": "Отмена" },
+  "actionClose": { "message": "Закрыть" },
+
+  "errAlreadyRunning": { "message": "Эта картинка уже обрабатывается." },
+  "errNotLoaded": { "message": "Картинка ещё не загрузилась. Попробуйте ещё раз." },
+  "errTainted": {
+    "message": "Сайт закрыл доступ к этой картинке, и загрузить её напрямую тоже не вышло."
+  },
+  "errDecode": { "message": "Не удалось прочитать эту картинку — возможно, файл повреждён." },
+  "errVector": { "message": "Это векторная картинка: она и так рисуется чётко в любом размере." },
+  "errTooLarge": { "message": "Картинка слишком большая — обработка не поместится в память." },
+  "errAborted": { "message": "Обработка отменена." },
+  "errOutOfMemory": { "message": "Не хватило памяти. Попробуйте уровень «быстро» в настройках." },
+  "errGeneric": { "message": "Не удалось обработать картинку." },
+  "errImageNotFound": { "message": "Не удалось найти эту картинку на странице." },
+
+  "pageBusy": { "message": "Обработка страницы уже идёт." },
+  "pageNoImages": { "message": "Подходящих картинок не найдено." },
+  "pageBatchTrimmed": {
+    "message": "Картинок больше, чем можно обработать за раз. Взяты первые $TAKEN$, пропущено $SKIPPED$.",
+    "placeholders": {
+      "taken": { "content": "$1", "example": "50" },
+      "skipped": { "content": "$2", "example": "12" }
+    }
+  },
+  "pageRestored": {
+    "message": "Восстановлено картинок: $COUNT$.",
+    "placeholders": { "count": { "content": "$1", "example": "13" } }
+  },
+  "failureGrouped": {
+    "message": "$REASON$ (картинок: $COUNT$)",
+    "placeholders": {
+      "reason": { "content": "$1" },
+      "count": { "content": "$2", "example": "7" }
+    }
+  },
+
+  "panelRunning": { "message": "Улучшаю изображения" },
+  "panelDone": { "message": "Готово" },
+  "panelCancelled": { "message": "Обработка остановлена" },
+  "panelProgress": {
+    "message": "$DONE$ из $TOTAL$",
+    "placeholders": {
+      "done": { "content": "$1", "example": "12" },
+      "total": { "content": "$2", "example": "40" }
+    }
+  },
+  "panelProgressSkipped": {
+    "message": "$DONE$ из $TOTAL$ · пропущено: $FAILED$",
+    "placeholders": {
+      "done": { "content": "$1", "example": "12" },
+      "total": { "content": "$2", "example": "40" },
+      "failed": { "content": "$3", "example": "2" }
+    }
+  },
+
+  "popupEnhancePage": { "message": "Улучшить все на странице" },
+  "popupSettings": { "message": "Настройки" },
+  "popupQuality": { "message": "Уровень качества" },
+  "popupImages": { "message": "Изображений на странице" },
+  "popupVideos": { "message": "Видео на странице" },
+  "popupServiceWorker": { "message": "Service worker" },
+  "popupNote": {
+    "message": "Отдельную картинку можно улучшить, наведя на неё курсор, или через контекстное меню по правому клику."
+  },
+  "popupChecking": { "message": "проверяю…" },
+  "popupNoAccess": { "message": "нет доступа" },
+  "popupSwOk": {
+    "message": "отвечает ($MS$ мс)",
+    "placeholders": { "ms": { "content": "$1", "example": "3" } }
+  },
+  "popupSwFail": { "message": "не отвечает" },
+
+  "optionsTitle": { "message": "ImageEnhancer — настройки" },
+  "sectionQuality": { "message": "Уровень качества" },
+  "sectionBehavior": { "message": "Поведение" },
+  "sectionDevice": { "message": "Это устройство" },
+  "sectionPrivacy": { "message": "Приватность" },
+
+  "levelAuto": { "message": "Автоматически" },
+  "levelAutoHint": { "message": "Расширение выберет уровень по возможностям устройства." },
+  "levelAutoResolved": {
+    "message": "На этом устройстве — «$LEVEL$».",
+    "placeholders": { "level": { "content": "$1", "example": "качественно" } }
+  },
+  "levelFast": { "message": "Быстро" },
+  "levelFastHint": {
+    "message": "Масштабирование средствами браузера. Единицы миллисекунд, результат мягкий. Подходит для слабых машин и очень больших изображений."
+  },
+  "levelBalanced": { "message": "Сбалансированно" },
+  "levelBalancedHint": {
+    "message": "Фильтр Ланцоша. Нейросеть — только при работающем WebGPU, иначе она была бы слишком медленной для этого уровня."
+  },
+  "levelQuality": { "message": "Качественно" },
+  "levelQualityHint": {
+    "message": "Нейросеть везде, где она применима, иначе фильтр Ланцоша с большим радиусом. На машинах без WebGPU обработка занимает секунды."
+  },
+  "levelNameFast": { "message": "быстро" },
+  "levelNameBalanced": { "message": "сбалансированно" },
+  "levelNameQuality": { "message": "качественно" },
+  "levelAutoSuffix": {
+    "message": "$LEVEL$ (авто)",
+    "placeholders": { "level": { "content": "$1", "example": "качественно" } }
+  },
+
+  "optReplaceOnPage": { "message": "Подменять картинку прямо на странице" },
+  "optReplaceOnPageHint": { "message": "Если выключить, результат можно будет только скачать." },
+  "optVerboseLogging": { "message": "Подробные логи в консоли" },
+  "optVerboseLoggingHint": {
+    "message": "Пригодится, если нужно понять, почему картинка не обработалась."
+  },
+  "optSaved": { "message": "сохранено" },
+
+  "capWebgpu": { "message": "WebGPU" },
+  "capWasmSimd": { "message": "WASM SIMD" },
+  "capCores": { "message": "Ядер CPU" },
+  "capMemory": { "message": "Память" },
+  "capYes": { "message": "есть" },
+  "capNo": { "message": "нет" },
+  "capUnknown": { "message": "неизвестно" },
+  "capMemoryValue": {
+    "message": "$GB$ ГБ",
+    "placeholders": { "gb": { "content": "$1", "example": "8" } }
+  },
+
+  "privacyText": {
+    "message": "Все вычисления выполняются на этом устройстве. Изображения никуда не отправляются, и расширение не собирает никакой статистики. Доступ ко всем сайтам нужен для одного: скачать картинку, которую вы явно выбрали, когда страница закрывает к ней доступ."
+  }
+}

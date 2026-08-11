@@ -144,7 +144,18 @@ image-enhancer/
 | 6 | Уровни качества и настройки | [07_Stage6_Settings_Impl.md](07_Stage6_Settings_Impl.md) | [07_Stage6_Settings_Guide.md](07_Stage6_Settings_Guide.md) | ✅ готов |
 | 7 | Устойчивость: CORS и ошибки | [08_Stage7_Resilience_Impl.md](08_Stage7_Resilience_Impl.md) | [08_Stage7_Resilience_Guide.md](08_Stage7_Resilience_Guide.md) | ✅ готов |
 | 8 | Заглушка видео-архитектуры | [09_Stage8_VideoStub_Impl.md](09_Stage8_VideoStub_Impl.md) | [09_Stage8_VideoStub_Guide.md](09_Stage8_VideoStub_Guide.md) | ✅ готов |
-| 9 | Полировка и упаковка | — | — | следующий |
+| 9 | Полировка и упаковка | [10_Stage9_Packaging_Impl.md](10_Stage9_Packaging_Impl.md) | [10_Stage9_Packaging_Guide.md](10_Stage9_Packaging_Guide.md) | ✅ готов |
+
+Все девять этапов закрыты. Отдельно: [PRIVACY.md](PRIVACY.md) — политика
+конфиденциальности для публикации.
+
+> **Важно перед публикацией.** Расширение ни разу не запускалось в настоящем
+> Chrome: все проверки выполнялись в изолированном стенде (страница с заглушкой
+> `chrome` API, собранные файлы, эмуляция service worker'а прокси-сервером).
+> Этого хватило, чтобы найти десяток настоящих ошибок, но не заменяет запуска.
+> Обязательны ручные проверки из разделов «Проверка» всех девяти гайдов —
+> особенно того, что стенд воспроизвести не мог: `host_permissions`,
+> `web_accessible_resources`, поведение CSP страницы при компиляции WebAssembly.
 
 ## Разрешения расширения: что уже есть и что появится
 
@@ -168,7 +179,19 @@ image-enhancer/
 npm install        # один раз после клонирования
 npm run dev        # сборка в режиме разработки + слежение за файлами + автоперезагрузка расширения
 npm run build      # продакшн-сборка в dist/
+npm run package    # сборка + проверки + zip для Chrome Web Store
 npm run typecheck  # проверка типов (сборка типы не проверяет!)
 npm run icons      # перегенерация иконок в public/icons/
 npm run clean      # удалить dist/
 ```
+
+## Локализация
+
+Строки интерфейса лежат в `public/_locales/{ru,en}/messages.json` и подставляются
+через `chrome.i18n`. В коде — обёртка `t()` из `src/core/i18n.ts`; в HTML-страницах
+расширения — атрибут `data-i18n`, потому что автоматической подстановки там нет
+(в отличие от `manifest.json`, где работает `__MSG_key__`).
+
+Согласованность локалей проверяет `npm run package`: совпадение наборов ключей
+и соответствие плейсхолдеров тексту. Ни то, ни другое Chrome не проверяет —
+он молча покажет пустую строку или `$SIZE$` прямо в интерфейсе.

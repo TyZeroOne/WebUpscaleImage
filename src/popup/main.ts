@@ -1,5 +1,6 @@
 import '@/ui/styles/base.css'
 import { detectCapabilities, recommendLevel } from '@/core/device'
+import { applyI18n, t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import { sendToBackground, sendToTab } from '@/core/messaging'
 import { getSettings } from '@/core/settings'
@@ -7,17 +8,19 @@ import { getSettings } from '@/core/settings'
 /**
  * Popup — окно, которое открывается по клику на иконку расширения.
  *
- * На этапе 0 он служит проверочной панелью: показывает версию, отвечает ли
- * service worker и что умеет железо. Это самый дешёвый способ убедиться, что
- * сборка, манифест и обмен сообщениями действительно работают.
- *
  * Важно про жизненный цикл: popup — это полноценный документ, который
  * УНИЧТОЖАЕТСЯ при каждом закрытии. Долгие операции здесь запускать нельзя,
- * они прервутся на полуслове. Поэтому очередь обработки на этапе 3 будет
- * жить в service worker'е, а popup — только показывать её состояние.
+ * они прервутся на полуслове. Поэтому очередь обработки живёт в content
+ * script, а popup только показывает состояние и запускает работу.
  */
 
 const log = createLogger('popup')
+
+const LEVEL_KEYS: Record<string, string> = {
+  fast: 'levelNameFast',
+  balanced: 'levelNameBalanced',
+  quality: 'levelNameQuality',
+}
 
 function setText(id: string, text: string, state?: 'ok' | 'fail'): void {
   const node = document.getElementById(id)
@@ -26,41 +29,28 @@ function setText(id: string, text: string, state?: 'ok' | 'fail'): void {
   node.className = state ? `ie-${state}` : ''
 }
 
-const LEVEL_NAMES: Record<string, string> = {
-  fast: 'быстро',
-  balanced: 'сбалансированно',
-  quality: 'качественно',
-}
-
 /**
  * Показывается ДЕЙСТВУЮЩИЙ уровень, а не значение настройки.
  *
  * При выборе «автоматически» строка «авто» ничего не сообщает: пользователь
  * хочет знать, что расширение будет делать, а не как оно это решило.
- * Поэтому «авто» разворачивается в конкретный уровень с пометкой.
  */
 async function renderQuality(): Promise<void> {
   const settings = await getSettings()
   if (settings.quality !== 'auto') {
-    setText('quality', LEVEL_NAMES[settings.quality] ?? settings.quality)
+    setText('quality', t(LEVEL_KEYS[settings.quality] ?? settings.quality))
     return
   }
   const level = recommendLevel(await detectCapabilities())
-  setText('quality', `${LEVEL_NAMES[level] ?? level} (авто)`)
+  setText('quality', t('levelAutoSuffix', t(LEVEL_KEYS[level] ?? level)))
 }
 
 async function renderCapabilities(): Promise<void> {
   const caps = await detectCapabilities()
-  setText(
-    'webgpu',
-    caps.webgpu ? (caps.webgpuAdapter ?? 'есть') : 'нет',
-    caps.webgpu ? 'ok' : 'fail',
-  )
-  setText('wasm-simd', caps.wasmSimd ? 'есть' : 'нет', caps.wasmSimd ? 'ok' : 'fail')
-  setText('offscreen', caps.offscreenCanvas ? 'есть' : 'нет', caps.offscreenCanvas ? 'ok' : 'fail')
-  setText('bitmap', caps.imageBitmap ? 'есть' : 'нет', caps.imageBitmap ? 'ok' : 'fail')
+  setText('webgpu', caps.webgpu ? (caps.webgpuAdapter ?? t('capYes')) : t('capNo'), caps.webgpu ? 'ok' : 'fail')
+  setText('wasm-simd', caps.wasmSimd ? t('capYes') : t('capNo'), caps.wasmSimd ? 'ok' : 'fail')
   setText('cores', String(caps.logicalCores))
-  setText('memory', caps.memoryGb === null ? 'неизвестно' : `${caps.memoryGb} ГБ`)
+  setText('memory', caps.memoryGb === null ? t('capUnknown') : t('capMemoryValue', caps.memoryGb))
 }
 
 async function pingBackground(): Promise<void> {
@@ -68,22 +58,13 @@ async function pingBackground(): Promise<void> {
   const response = await sendToBackground('PING', { sentAt })
 
   if (!response) {
-    setText('sw', 'не отвечает', 'fail')
+    setText('sw', t('popupSwFail'), 'fail')
     return
   }
   const elapsed = Math.round(performance.now() - response.roundTripStartedAt)
-  setText('sw', `отвечает (${elapsed} мс)`, 'ok')
+  setText('sw', t('popupSwOk', elapsed), 'ok')
 }
 
-/**
- * Спрашиваем у активной вкладки, что на ней есть.
- *
- * Popup не имеет доступа к DOM страницы — он вообще другой документ, в другом
- * контексте. Единственный способ узнать про страницу — спросить content script.
- *
- * chrome.tabs.query без разрешения `tabs` возвращает вкладки, но без url
- * и title. Нам нужен только id, поэтому разрешение не требуется.
- */
 async function activeTabId(): Promise<number | undefined> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   return tab?.id
@@ -97,8 +78,8 @@ async function scanActiveTab(): Promise<void> {
   if (!result) {
     // Штатная ситуация: служебная страница (chrome://, страница настроек,
     // Chrome Web Store), куда content script не внедряется по правилам Chrome.
-    setText('page-images', 'нет доступа')
-    setText('page-videos', 'нет доступа')
+    setText('page-images', t('popupNoAccess'))
+    setText('page-videos', t('popupNoAccess'))
     if (enhanceButton) enhanceButton.disabled = true
     return
   }
@@ -123,6 +104,7 @@ async function startPageEnhance(): Promise<void> {
   window.close()
 }
 
+applyI18n()
 setText('version', `v${chrome.runtime.getManifest().version}`)
 void renderCapabilities().catch((error: unknown) => log.error('Детекция устройства:', error))
 void renderQuality().catch((error: unknown) => log.error('Уровень качества:', error))

@@ -34,24 +34,49 @@ function insideRoundedRect(x, y, radius) {
   return dx * dx + dy * dy <= radius * radius
 }
 
-/** Глиф: стрелка вверх над горизонтальной линией — «поднять качество». */
-function insideGlyph(x, y) {
-  // Опорная линия снизу.
-  if (x >= 0.26 && x <= 0.74 && y >= 0.78 && y <= 0.86) return true
-  // Ствол стрелки.
-  if (x >= 0.435 && x <= 0.565 && y >= 0.40 && y <= 0.72) return true
-  // Наконечник: треугольник с вершиной сверху.
-  if (y >= 0.175 && y <= 0.44) {
-    const t = (y - 0.175) / (0.44 - 0.175)
-    if (Math.abs(x - 0.5) <= 0.215 * t) return true
+/**
+ * Глиф: стрелка вверх над горизонтальной линией — «поднять качество».
+ *
+ * ГЛИФ ЗАВИСИТ ОТ РАЗМЕРА, и это главное, что изменилось на этапе 9.
+ *
+ * Иконка 16×16 — это шестнадцать пикселей на всю картинку. Опорная линия
+ * толщиной 0.08 от высоты превращается в ней в 1.3 пикселя: после сглаживания
+ * получается серая полоска, которую не видно, но которая делает изображение
+ * грязным. То же с тонкими скруглениями.
+ *
+ * Поэтому маленькие размеры рисуются упрощённо: без опорной линии, стрелка
+ * толще и крупнее. Это стандартная практика для иконок, и её отсутствие —
+ * причина, по которой самодельные иконки выглядят мыльными в панели браузера.
+ */
+function insideGlyph(x, y, detailed) {
+  if (detailed) {
+    // Опорная линия снизу.
+    if (x >= 0.26 && x <= 0.74 && y >= 0.78 && y <= 0.86) return true
+    // Ствол стрелки.
+    if (x >= 0.435 && x <= 0.565 && y >= 0.40 && y <= 0.72) return true
+    // Наконечник: треугольник с вершиной сверху.
+    if (y >= 0.175 && y <= 0.44) {
+      const t = (y - 0.175) / (0.44 - 0.175)
+      if (Math.abs(x - 0.5) <= 0.215 * t) return true
+    }
+    return false
+  }
+
+  // Упрощённый вариант: только стрелка, крупнее и толще.
+  if (x >= 0.40 && x <= 0.60 && y >= 0.42 && y <= 0.80) return true
+  if (y >= 0.16 && y <= 0.48) {
+    const t = (y - 0.16) / (0.48 - 0.16)
+    if (Math.abs(x - 0.5) <= 0.28 * t) return true
   }
   return false
 }
 
 /** Цвет и альфа в точке (x, y), координаты нормализованы в 0..1. */
-function sample(x, y) {
-  if (!insideRoundedRect(x, y, 0.22)) return [0, 0, 0, 0]
-  if (insideGlyph(x, y)) return [255, 255, 255, 1]
+function sample(x, y, detailed) {
+  // Скругление тоже зависит от размера: на 16 px радиус 0.22 съедает
+  // заметную долю площади и икона выглядит круглой, а не квадратной.
+  if (!insideRoundedRect(x, y, detailed ? 0.22 : 0.18)) return [0, 0, 0, 0]
+  if (insideGlyph(x, y, detailed)) return [255, 255, 255, 1]
   const t = (x + y) / 2
   return [
     COLOR_A[0] + (COLOR_B[0] - COLOR_A[0]) * t,
@@ -63,6 +88,8 @@ function sample(x, y) {
 
 /** Рендер одной иконки размера size в буфер RGBA. */
 function render(size) {
+  // Ниже 32 px мелкие детали не выживают — рисуем упрощённый глиф.
+  const detailed = size >= 32
   const n = size * SUPERSAMPLE
   const samplesPerPixel = SUPERSAMPLE * SUPERSAMPLE
   // Накапливаем цвет, умноженный на альфу (premultiplied) — иначе на границе
@@ -74,7 +101,7 @@ function render(size) {
     const row = Math.floor(py / SUPERSAMPLE)
     for (let px = 0; px < n; px++) {
       const x = (px + 0.5) / n
-      const [r, g, b, a] = sample(x, y)
+      const [r, g, b, a] = sample(x, y, detailed)
       const i = (row * size + Math.floor(px / SUPERSAMPLE)) * 4
       acc[i] += r * a
       acc[i + 1] += g * a

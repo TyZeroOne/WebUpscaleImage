@@ -1,13 +1,14 @@
 {
   "name": "image-enhancer",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Chrome MV3 extension that upscales and cleans up images directly on the page, fully locally.",
+  "description": "Chrome MV3 extension that upscales images directly on the page, fully locally.",
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "dev": "node scripts/build.mjs --watch",
     "build": "node scripts/build.mjs",
+    "package": "node scripts/build.mjs && node scripts/package.mjs",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/generate-icons.mjs"
   },

@@ -1,5 +1,6 @@
 import '@/ui/styles/base.css'
 import { detectCapabilities, recommendLevel } from '@/core/device'
+import { applyI18n, t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import { type QualityPreference, getSettings, patchSettings } from '@/core/settings'
 
@@ -17,15 +18,15 @@ import { type QualityPreference, getSettings, patchSettings } from '@/core/setti
 
 const log = createLogger('options')
 
-const LEVEL_NAMES: Record<string, string> = {
-  fast: 'быстро',
-  balanced: 'сбалансированно',
-  quality: 'качественно',
+const LEVEL_KEYS: Record<string, string> = {
+  fast: 'levelNameFast',
+  balanced: 'levelNameBalanced',
+  quality: 'levelNameQuality',
 }
 
 function flashSaved(node: Element | null): void {
   if (!(node instanceof HTMLElement)) return
-  node.textContent = 'сохранено'
+  node.textContent = t('optSaved')
   node.className = 'save-state ie-ok'
   setTimeout(() => {
     node.textContent = ''
@@ -49,25 +50,30 @@ async function renderDevice(): Promise<void> {
   const capabilities = await detectCapabilities()
   setText(
     'cap-webgpu',
-    capabilities.webgpu ? (capabilities.webgpuAdapter ?? 'есть') : 'нет',
+    capabilities.webgpu ? (capabilities.webgpuAdapter ?? t('capYes')) : t('capNo'),
     capabilities.webgpu ? 'ok' : 'fail',
   )
-  setText('cap-simd', capabilities.wasmSimd ? 'есть' : 'нет', capabilities.wasmSimd ? 'ok' : 'fail')
+  setText(
+    'cap-simd',
+    capabilities.wasmSimd ? t('capYes') : t('capNo'),
+    capabilities.wasmSimd ? 'ok' : 'fail',
+  )
   setText('cap-cores', String(capabilities.logicalCores))
   setText(
     'cap-memory',
-    capabilities.memoryGb === null ? 'неизвестно' : `${capabilities.memoryGb} ГБ`,
+    capabilities.memoryGb === null ? t('capUnknown') : t('capMemoryValue', capabilities.memoryGb),
   )
 
   // Подсказка у варианта «автоматически»: что именно он сейчас означает.
   const hint = document.getElementById('auto-hint')
   if (hint) {
     const level = recommendLevel(capabilities)
-    hint.textContent = `На этом устройстве — «${LEVEL_NAMES[level] ?? level}».`
+    hint.textContent = t('levelAutoResolved', t(LEVEL_KEYS[level] ?? level))
   }
 }
 
 async function init(): Promise<void> {
+  applyI18n()
   const version = document.getElementById('version')
   if (version) version.textContent = `v${chrome.runtime.getManifest().version}`
 
