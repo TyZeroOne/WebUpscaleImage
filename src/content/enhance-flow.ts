@@ -88,7 +88,14 @@ export class AlreadyRunningError extends Error {
 export function describeFailure(error: unknown): string {
   if (error instanceof AlreadyRunningError) return t('errAlreadyRunning')
   if (error instanceof NothingToDoError) {
-    return t(error.reason === 'refine-no-op' ? 'errRefineNoOp' : 'errAlreadyBigEnough')
+    switch (error.reason) {
+      case 'already-big-enough':
+        return t('errAlreadyBigEnough')
+      case 'refine-no-op':
+        return t('errRefineNoOp')
+      case 'refine-too-large':
+        return t('errRefineTooLarge')
+    }
   }
   if (error instanceof ImageSourceError) {
     switch (error.reason) {

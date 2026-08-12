@@ -58,6 +58,9 @@
   "errRefineNoOp": {
     "message": "Nothing to improve with: sharpening is off and the selected network adds no detail. Raise the sharpness or pick the detailed model in settings."
   },
+  "errRefineTooLarge": {
+    "message": "This image is too large for the detailed model on this device, and sharpening is off. Raise the sharpness in settings — it works at any size."
+  },
 
   "pageBusy": { "message": "This page is already being processed." },
   "pageNoImages": { "message": "No suitable images found." },

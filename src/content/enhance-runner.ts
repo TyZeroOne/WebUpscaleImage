@@ -296,7 +296,12 @@ async function runRefine(
      */
     if (options.sharpen <= 0) {
       input.bitmap.close()
-      throw new NothingToDoError('refine-no-op')
+      /**
+       * Причины две, и выход из них разный. Если модель отвергнута по своей
+       * природе — надо выбрать другую. Если она подходящая, но картинка
+       * для неё велика — модель менять как раз не нужно.
+       */
+      throw new NothingToDoError(worthTrying ? 'refine-too-large' : 'refine-no-op')
     }
     log.debug('Улучшаю качество только маскированием: подходящей модели нет')
     return runClassic(input, { ...options, scale: 1 }, signal)
