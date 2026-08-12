@@ -1,5 +1,11 @@
-import { resolvePlan, resolveScale, resolveTargetScale, resolveTargetSize } from '@/core/enhance'
-import type { EnhanceOperation, QualityLevel } from '@/core/enhance'
+import {
+  NothingToDoError,
+  resolvePlan,
+  resolveScale,
+  resolveTargetScale,
+  resolveTargetSize,
+} from '@/core/enhance'
+import type { EnhanceOperation, NothingToDoReason, QualityLevel } from '@/core/enhance'
 import type { Settings } from '@/core/settings'
 import { getSettings } from '@/core/settings'
 import { t } from '@/core/i18n'
@@ -9,6 +15,7 @@ import type { EnhanceTrigger } from '@/core/messaging'
 import type { Toaster } from '@/ui/toast'
 import { buildFileName, downloadBlob, replaceOnPage, restoreOriginal } from './apply-result'
 import { isWorkerModeActive, runEnhance } from './enhance-runner'
+import { modelSynthesizesDetail } from './ml-client'
 import { ImageSourceError, acquireReadableBitmap } from './image-source'
 import { resolveQualityLevel } from './quality'
 import { yieldUntilPainted } from './scheduler'
@@ -80,7 +87,9 @@ export class AlreadyRunningError extends Error {
  */
 export function describeFailure(error: unknown): string {
   if (error instanceof AlreadyRunningError) return t('errAlreadyRunning')
-  if (error instanceof NothingToDoError) return t('errAlreadyBigEnough')
+  if (error instanceof NothingToDoError) {
+    return t(error.reason === 'refine-no-op' ? 'errRefineNoOp' : 'errAlreadyBigEnough')
+  }
   if (error instanceof ImageSourceError) {
     switch (error.reason) {
       case 'not-loaded':
@@ -105,12 +114,26 @@ export function describeFailure(error: unknown): string {
   return t('errGeneric')
 }
 
-/** Картинка уже подходит под заданный размер — обрабатывать нечего. */
-export class NothingToDoError extends Error {
-  constructor() {
-    super('Картинка уже нужного размера')
-    this.name = 'NothingToDoError'
-  }
+export { NothingToDoError }
+
+/**
+ * Изменит ли операция «улучшить качество» хоть что-нибудь.
+ *
+ * Улучшение складывается ровно из двух вкладов: модель, синтезирующая детали,
+ * и нерезкое маскирование. Уберите оба — и остаётся тождественное
+ * преобразование: конвейер честно отработает, вернёт те же пиксели, подменит
+ * картинку на странице файлом, который может весить больше оригинала,
+ * и отрапортует «Готово». Пользователь при этом не увидит никакой разницы
+ * и будет прав.
+ *
+ * Проверка намеренно консервативна: она отвечает «нечего делать» только тогда,
+ * когда это известно ТОЧНО, без загрузки модели. Случай «модель подходит,
+ * но картинка для неё слишком велика» здесь не виден и ловится позже,
+ * уже в runRefine.
+ */
+export function refineChangesNothing(level: QualityLevel, settings: Settings): boolean {
+  const modelHelps = resolvePlan(level).useMl && modelSynthesizesDetail(settings.model)
+  return !modelHelps && settings.sharpen === 0
 }
 
 /**
@@ -120,24 +143,29 @@ export class NothingToDoError extends Error {
  *  - 'auto' — от того, насколько картинке не хватает пикселей на экране;
  *  - 'longest-side' — привести длинную сторону к заданному числу, хоть вверх,
  *    хоть вниз.
+ *
+ * `skip` — не булев флаг, а причина отказа или null. Причин две, и сообщения
+ * у них разные: «картинка уже нужного размера» в ответ на просьбу улучшить
+ * качество сбивало бы с толку, ведь размер тут ни при чём.
  */
 export function planEnhance(
   image: HTMLImageElement,
   level: QualityLevel,
   settings: Settings,
   operation: EnhanceOperation = 'upscale',
-): { scale: number; width: number; height: number; skip: boolean } {
+): { scale: number; width: number; height: number; skip: NothingToDoReason | null } {
   /**
    * Улучшение качества не меняет размер, поэтому ни целевой размер,
-   * ни потолок увеличения к нему не относятся. И пропускать тут нечего:
+   * ни потолок увеличения к нему не относятся. И отсеивать по размеру нечего:
    * «картинка уже достаточно большая» — не довод против улучшения качества.
+   * Единственный повод отказаться — что улучшать её нечем.
    */
   if (operation === 'refine') {
     return {
       scale: 1,
       width: image.naturalWidth,
       height: image.naturalHeight,
-      skip: false,
+      skip: refineChangesNothing(level, settings) ? 'refine-no-op' : null,
     }
   }
 
@@ -152,13 +180,18 @@ export function planEnhance(
       maxScale,
     )
     const target = resolveTargetSize(image.naturalWidth, image.naturalHeight, plan.scale)
-    return { scale: plan.scale, width: target.width, height: target.height, skip: plan.skip }
+    return {
+      scale: plan.scale,
+      width: target.width,
+      height: target.height,
+      skip: plan.skip ? 'already-big-enough' : null,
+    }
   }
 
   const displayWidth = image.getBoundingClientRect().width
   const scale = resolveScale(displayWidth, image.naturalWidth, window.devicePixelRatio, maxScale)
   const target = resolveTargetSize(image.naturalWidth, image.naturalHeight, scale)
-  return { scale, width: target.width, height: target.height, skip: false }
+  return { scale, width: target.width, height: target.height, skip: null }
 }
 
 /**
@@ -186,7 +219,7 @@ export async function enhanceImageCore(
    */
   if (skip) {
     inFlight.delete(image)
-    throw new NothingToDoError()
+    throw new NothingToDoError(skip)
   }
 
   // Отчёт в service worker. На этапе 2-3 он только пишет в лог: сама работа
@@ -273,7 +306,7 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
     // Отказываем сразу, не показывая уведомление о начале работы:
     // мигающее «обрабатываю» перед отказом только сбивает с толку.
     if (plan.skip) {
-      toaster.show(t('errAlreadyBigEnough'))
+      toaster.show(describeFailure(new NothingToDoError(plan.skip)))
       return
     }
 

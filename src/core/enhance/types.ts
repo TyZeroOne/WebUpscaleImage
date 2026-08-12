@@ -24,6 +24,37 @@ export type QualityLevel = 'fast' | 'balanced' | 'quality'
  */
 export type EnhanceOperation = 'upscale' | 'refine'
 
+/**
+ * Почему запрошенная работа не изменила бы картинку.
+ *
+ * 'already-big-enough' — картинка уже не меньше целевого размера, а галочка
+ *                        велит такие не трогать.
+ * 'refine-no-op'       — улучшать нечем: выбранная модель не синтезирует
+ *                        детали (или неприменима), а резкость выключена.
+ *                        Улучшение качества складывается ровно из этих двух
+ *                        вкладов, и без обоих операция вернула бы тот же
+ *                        файл — только пересжатый и, возможно, более тяжёлый.
+ */
+export type NothingToDoReason = 'already-big-enough' | 'refine-no-op'
+
+/**
+ * Работы нет — и это не ошибка.
+ *
+ * Класс живёт здесь, а не в content-слое, потому что причину обнаруживают
+ * в двух разных местах: планировщик — до получения пикселей, вычислитель —
+ * уже после того, как выяснилось, что модель к этой картинке неприменима.
+ */
+export class NothingToDoError extends Error {
+  constructor(readonly reason: NothingToDoReason) {
+    super(
+      reason === 'refine-no-op'
+        ? 'Улучшать нечем: ни модели, ни резкости'
+        : 'Картинка уже нужного размера',
+    )
+    this.name = 'NothingToDoError'
+  }
+}
+
 /** Чем именно посчитали результат — нужно и для логов, и для UI. */
 export type EnhanceBackend = 'canvas-bilinear' | 'canvas-lanczos' | 'ml-webgpu' | 'ml-wasm'
 

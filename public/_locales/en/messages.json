@@ -55,6 +55,9 @@
   "errImageNotFound": { "message": "Couldn't find that image on the page." },
 
   "errAlreadyBigEnough": { "message": "This image is already the target size — nothing to do." },
+  "errRefineNoOp": {
+    "message": "Nothing to improve with: sharpening is off and the selected network adds no detail. Raise the sharpness or pick the detailed model in settings."
+  },
 
   "pageBusy": { "message": "This page is already being processed." },
   "pageNoImages": { "message": "No suitable images found." },
@@ -169,7 +172,7 @@
   "sectionSharpen": { "message": "Sharpness" },
   "sharpen": { "message": "Unsharp mask" },
   "sharpenHint": {
-    "message": "Boosts brightness transitions at edges after upscaling. Unlike the neural network it invents nothing — it only emphasises what is already there. All the models deliberately leave sharpening alone. Above 60% on compressed images, light halos start to appear around high-contrast edges."
+    "message": "Boosts brightness transitions at edges after upscaling. Unlike the neural network it invents nothing — it only emphasises what is already there. All the models deliberately leave sharpening alone. Above 60% on compressed images, light halos start to appear around high-contrast edges. For the \"Quality\" button with the light or medium model this is the only tool that does anything: at zero it will change nothing."
   },
 
   "sectionTarget": { "message": "Output size" },

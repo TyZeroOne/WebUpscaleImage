@@ -1,4 +1,4 @@
-import { createEnhancer, isMlAllowed, resolvePlan } from '@/core/enhance'
+import { NothingToDoError, createEnhancer, isMlAllowed, resolvePlan } from '@/core/enhance'
 import type { EnhanceOperation, EnhanceOptions, EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
 import type { ModelChoice } from '@/core/settings'
@@ -288,7 +288,16 @@ async function runRefine(
      * Без подходящей модели остаётся нерезкое маскирование. Это честно
      * меньше, но измеримо лучше и оригинала, и кругового рейса через
      * сглаживающую модель.
+     *
+     * А если и резкость выключена, делать нечего вовсе. Сюда попадают
+     * случаи, которых планировщик увидеть не мог: модель подходит
+     * по свойству, но картинка для неё слишком велика. Без этой проверки
+     * расширение подменило бы картинку её же копией и отрапортовало «Готово».
      */
+    if (options.sharpen <= 0) {
+      input.bitmap.close()
+      throw new NothingToDoError('refine-no-op')
+    }
     log.debug('Улучшаю качество только маскированием: подходящей модели нет')
     return runClassic(input, { ...options, scale: 1 }, signal)
   }

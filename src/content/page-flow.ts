@@ -6,7 +6,12 @@ import type { Toaster } from '@/ui/toast'
 import { hasOriginal, restoreOriginal } from './apply-result'
 import { scanMedia } from './detect'
 import { getSettings } from '@/core/settings'
-import { describeFailure, enhanceImageCore, planEnhance } from './enhance-flow'
+import {
+  describeFailure,
+  enhanceImageCore,
+  planEnhance,
+  refineChangesNothing,
+} from './enhance-flow'
 import { resolveConcurrency } from './enhance-runner'
 import { runQueue } from './queue'
 import { resolveQualityLevel } from './quality'
@@ -120,11 +125,19 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
       .sort(byViewportPriority)
 
     if (candidates.length === 0) {
-      return {
-        started: false,
-        total: 0,
-        reason: settings.targetMode === 'longest-side' ? t('pageAllBigEnough') : t('pageNoImages'),
-      }
+      /**
+       * Причина отказа должна называть то, что пользователь может изменить.
+       * «Подходящих картинок не найдено» в ответ на «улучшить качество всех»
+       * при выключенной резкости — правда, но бесполезная: картинки-то есть,
+       * это улучшать их нечем.
+       */
+      const reason =
+        operation === 'refine' && refineChangesNothing(level, settings)
+          ? t('errRefineNoOp')
+          : settings.targetMode === 'longest-side'
+            ? t('pageAllBigEnough')
+            : t('pageNoImages')
+      return { started: false, total: 0, reason }
     }
 
     const batch = candidates.slice(0, MAX_BATCH_SIZE)
