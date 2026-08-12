@@ -48,6 +48,66 @@
       </label>
     </fieldset>
 
+    <h2 class="ie-section" data-i18n="sectionModel"></h2>
+
+    <fieldset class="ie-choices" id="model">
+      <label class="ie-choice">
+        <input type="radio" name="model" value="slim" />
+        <span>
+          <b data-i18n="modelSlim"></b>
+          <small data-i18n="modelSlimHint"></small>
+        </span>
+      </label>
+
+      <label class="ie-choice">
+        <input type="radio" name="model" value="medium" />
+        <span>
+          <b data-i18n="modelMedium"></b>
+          <small data-i18n="modelMediumHint"></small>
+        </span>
+      </label>
+    </fieldset>
+
+    <h2 class="ie-section" data-i18n="sectionTarget"></h2>
+
+    <fieldset class="ie-choices" id="target-mode">
+      <label class="ie-choice">
+        <input type="radio" name="targetMode" value="auto" />
+        <span>
+          <b data-i18n="targetAuto"></b>
+          <small data-i18n="targetAutoHint"></small>
+        </span>
+      </label>
+
+      <label class="ie-choice">
+        <input type="radio" name="targetMode" value="longest-side" />
+        <span>
+          <b data-i18n="targetLongestSide"></b>
+          <small data-i18n="targetLongestSideHint"></small>
+        </span>
+      </label>
+    </fieldset>
+
+    <ul class="ie-rows" id="target-extra">
+      <li>
+        <dfn data-i18n="targetPxLabel"></dfn>
+        <span class="ie-inline">
+          <input type="number" id="target-px" min="64" max="8192" step="16" />
+          <b class="save-state"></b>
+        </span>
+      </li>
+      <li>
+        <label class="ie-check">
+          <input type="checkbox" id="skip-if-large" />
+          <span>
+            <span data-i18n="optSkipIfLargeEnough"></span>
+            <small data-i18n="optSkipIfLargeEnoughHint"></small>
+          </span>
+        </label>
+        <b class="save-state"></b>
+      </li>
+    </ul>
+
     <h2 class="ie-section" data-i18n="sectionBehavior"></h2>
 
     <ul class="ie-rows">

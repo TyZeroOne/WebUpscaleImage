@@ -1,5 +1,6 @@
-import { resolvePlan, resolveScale, resolveTargetSize } from '@/core/enhance'
+import { resolvePlan, resolveScale, resolveTargetScale, resolveTargetSize } from '@/core/enhance'
 import type { QualityLevel } from '@/core/enhance'
+import type { Settings } from '@/core/settings'
 import { getSettings } from '@/core/settings'
 import { t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
@@ -79,6 +80,7 @@ export class AlreadyRunningError extends Error {
  */
 export function describeFailure(error: unknown): string {
   if (error instanceof AlreadyRunningError) return t('errAlreadyRunning')
+  if (error instanceof NothingToDoError) return t('errAlreadyBigEnough')
   if (error instanceof ImageSourceError) {
     switch (error.reason) {
       case 'not-loaded':
@@ -103,20 +105,45 @@ export function describeFailure(error: unknown): string {
   return t('errGeneric')
 }
 
-/** Целевой размер — нужен ещё до начала работы, чтобы показать его в UI. */
+/** Картинка уже подходит под заданный размер — обрабатывать нечего. */
+export class NothingToDoError extends Error {
+  constructor() {
+    super('Картинка уже нужного размера')
+    this.name = 'NothingToDoError'
+  }
+}
+
+/**
+ * Целевой размер — нужен ещё до начала работы, чтобы показать его в UI.
+ *
+ * Два режима определения коэффициента:
+ *  - 'auto' — от того, насколько картинке не хватает пикселей на экране;
+ *  - 'longest-side' — привести длинную сторону к заданному числу, хоть вверх,
+ *    хоть вниз.
+ */
 export function planEnhance(
   image: HTMLImageElement,
   level: QualityLevel,
-): { scale: number; width: number; height: number } {
+  settings: Settings,
+): { scale: number; width: number; height: number; skip: boolean } {
+  const maxScale = resolvePlan(level).maxScale
+
+  if (settings.targetMode === 'longest-side') {
+    const plan = resolveTargetScale(
+      image.naturalWidth,
+      image.naturalHeight,
+      settings.targetPx,
+      settings.skipIfLargeEnough,
+      maxScale,
+    )
+    const target = resolveTargetSize(image.naturalWidth, image.naturalHeight, plan.scale)
+    return { scale: plan.scale, width: target.width, height: target.height, skip: plan.skip }
+  }
+
   const displayWidth = image.getBoundingClientRect().width
-  const scale = resolveScale(
-    displayWidth,
-    image.naturalWidth,
-    window.devicePixelRatio,
-    resolvePlan(level).maxScale,
-  )
+  const scale = resolveScale(displayWidth, image.naturalWidth, window.devicePixelRatio, maxScale)
   const target = resolveTargetSize(image.naturalWidth, image.naturalHeight, scale)
-  return { scale, width: target.width, height: target.height }
+  return { scale, width: target.width, height: target.height, skip: false }
 }
 
 /**
@@ -133,7 +160,18 @@ export async function enhanceImageCore(
 
   const sourceUrl = image.currentSrc || image.src
   const level = await resolveQualityLevel()
-  const { scale } = planEnhance(image, level)
+  const settings = await getSettings()
+  const { scale, skip } = planEnhance(image, level, settings)
+
+  /**
+   * Отказ до всякой работы: картинка уже подходит под заданный размер.
+   * Проверяется здесь, а не только в очереди, чтобы одиночный клик тоже
+   * получал внятный ответ, а не молча ничего не делал.
+   */
+  if (skip) {
+    inFlight.delete(image)
+    throw new NothingToDoError()
+  }
 
   // Отчёт в service worker. На этапе 2-3 он только пишет в лог: сама работа
   // идёт здесь. На этапе 4 это сообщение станет передачей задачи.
@@ -160,7 +198,7 @@ export async function enhanceImageCore(
     // С этого момента картинкой владеет runEnhance: она либо уедет в воркер
     // вместе с владением, либо будет освобождена там же после вычислений.
     handedOff = true
-    const result = await runEnhance({ bitmap, sourceUrl }, { level, scale }, signal)
+    const result = await runEnhance({ bitmap, sourceUrl }, { level, scale }, settings.model, signal)
 
     log.info(
       `Готово за ${result.durationMs} мс (${result.backend}, ` +
@@ -174,7 +212,6 @@ export async function enhanceImageCore(
      * хочет получить файл, не трогая вид сайта: подменённая картинка может
      * сломать вёрстку, если сайт рассчитывает на конкретные размеры.
      */
-    const settings = await getSettings()
     if (settings.replaceOnPage) replaceOnPage(image, result.blob)
 
     return {
@@ -207,7 +244,15 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
     trigger: EnhanceTrigger,
   ): Promise<void> {
     const level = await resolveQualityLevel()
-    const plan = planEnhance(image, level)
+    const plan = planEnhance(image, level, await getSettings())
+
+    // Отказываем сразу, не показывая уведомление о начале работы:
+    // мигающее «обрабатываю» перед отказом только сбивает с толку.
+    if (plan.skip) {
+      toaster.show(t('errAlreadyBigEnough'))
+      return
+    }
+
     const progress = toaster.show(
       t(
         'toastProcessing',

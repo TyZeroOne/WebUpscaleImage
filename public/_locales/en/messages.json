@@ -46,8 +46,11 @@
   "errGeneric": { "message": "Couldn't process this image." },
   "errImageNotFound": { "message": "Couldn't find that image on the page." },
 
+  "errAlreadyBigEnough": { "message": "This image is already the target size — nothing to do." },
+
   "pageBusy": { "message": "This page is already being processed." },
   "pageNoImages": { "message": "No suitable images found." },
+  "pageAllBigEnough": { "message": "All images are already the target size." },
   "pageBatchTrimmed": {
     "message": "Too many images for one run. Took the first $TAKEN$, skipped $SKIPPED$.",
     "placeholders": {
@@ -133,6 +136,31 @@
   "levelAutoSuffix": {
     "message": "$LEVEL$ (auto)",
     "placeholders": { "level": { "content": "$1", "example": "best quality" } }
+  },
+
+  "sectionModel": { "message": "Neural network" },
+  "modelSlim": { "message": "Light (ESRGAN-slim)" },
+  "modelSlimHint": {
+    "message": "0.9 MB of weights. Fast: about 0.1 s for a 600×400 image on WebGPU. Moderate improvement."
+  },
+  "modelMedium": { "message": "Heavy (ESRGAN-medium)" },
+  "modelMediumHint": {
+    "message": "2.7 MB of weights, roughly three times the network. Noticeably more detail, but several times slower; the image size limit for it is four times lower. Not recommended without WebGPU."
+  },
+
+  "sectionTarget": { "message": "Output size" },
+  "targetAuto": { "message": "Automatic" },
+  "targetAutoHint": {
+    "message": "The factor is derived from how many pixels the image lacks on screen."
+  },
+  "targetLongestSide": { "message": "Fit the longest side to" },
+  "targetLongestSideHint": {
+    "message": "Images smaller than the target are enlarged, larger ones are shrunk. Longest side rather than width: otherwise portrait images would grow disproportionately."
+  },
+  "targetPxLabel": { "message": "Pixels on the longest side" },
+  "optSkipIfLargeEnough": { "message": "Leave images that already meet the target" },
+  "optSkipIfLargeEnoughHint": {
+    "message": "If off, larger images are shrunk down to the target size."
   },
 
   "optReplaceOnPage": { "message": "Replace the image on the page" },

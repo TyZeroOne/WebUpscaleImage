@@ -46,8 +46,11 @@
   "errGeneric": { "message": "Не удалось обработать картинку." },
   "errImageNotFound": { "message": "Не удалось найти эту картинку на странице." },
 
+  "errAlreadyBigEnough": { "message": "Картинка уже нужного размера — обрабатывать нечего." },
+
   "pageBusy": { "message": "Обработка страницы уже идёт." },
   "pageNoImages": { "message": "Подходящих картинок не найдено." },
+  "pageAllBigEnough": { "message": "Все картинки уже нужного размера." },
   "pageBatchTrimmed": {
     "message": "Картинок больше, чем можно обработать за раз. Взяты первые $TAKEN$, пропущено $SKIPPED$.",
     "placeholders": {
@@ -133,6 +136,31 @@
   "levelAutoSuffix": {
     "message": "$LEVEL$ (авто)",
     "placeholders": { "level": { "content": "$1", "example": "качественно" } }
+  },
+
+  "sectionModel": { "message": "Нейросеть" },
+  "modelSlim": { "message": "Лёгкая (ESRGAN-slim)" },
+  "modelSlimHint": {
+    "message": "Веса 0.9 МБ. Быстрая: около 0.1 с на картинку 600×400 при WebGPU. Улучшение умеренное."
+  },
+  "modelMedium": { "message": "Тяжёлая (ESRGAN-medium)" },
+  "modelMediumHint": {
+    "message": "Веса 2.7 МБ, сеть примерно втрое больше. Заметно детальнее, но и медленнее в несколько раз; предел размера картинки для неё снижен вчетверо. Без WebGPU лучше не включать."
+  },
+
+  "sectionTarget": { "message": "Размер результата" },
+  "targetAuto": { "message": "Автоматически" },
+  "targetAutoHint": {
+    "message": "Коэффициент считается от того, насколько картинке не хватает пикселей на экране."
+  },
+  "targetLongestSide": { "message": "Привести длинную сторону к размеру" },
+  "targetLongestSideHint": {
+    "message": "Картинки меньше цели увеличиваются, больше — уменьшаются. Длинная сторона, а не ширина: иначе вертикальные картинки вырастали бы несоразмерно."
+  },
+  "targetPxLabel": { "message": "Пикселей по длинной стороне" },
+  "optSkipIfLargeEnough": { "message": "Не трогать картинки, которые уже не меньше цели" },
+  "optSkipIfLargeEnoughHint": {
+    "message": "Если выключить, крупные картинки будут уменьшаться до заданного размера."
   },
 
   "optReplaceOnPage": { "message": "Подменять картинку прямо на странице" },

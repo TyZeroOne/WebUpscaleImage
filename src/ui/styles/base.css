@@ -203,3 +203,29 @@ label.ie-choice:has(input:checked) {
 label.ie-choice input {
   margin-top: 2px;
 }
+
+.ie-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+input[type='number'] {
+  width: 88px;
+  padding: 4px 6px;
+  border: 1px solid var(--ie-border);
+  border-radius: 6px;
+  background: var(--ie-bg);
+  color: var(--ie-fg);
+  font: inherit;
+  text-align: right;
+}
+
+input[type='number']:focus {
+  outline: none;
+  border-color: var(--ie-accent);
+}
+
+ul.ie-rows[hidden] {
+  display: none;
+}

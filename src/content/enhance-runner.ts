@@ -1,6 +1,7 @@
 import { createEnhancer, isMlAllowed, resolvePlan } from '@/core/enhance'
 import type { EnhanceOptions, EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
+import type { ModelChoice } from '@/core/settings'
 import { getMlRuntime, isMlApplicable } from './ml-client'
 import { ML_SCALE } from '@/workers/ml-protocol'
 import { type EnhancePool, createEnhancePool } from './worker-pool'
@@ -106,6 +107,7 @@ async function finishScaling(
 export async function runEnhance(
   input: { bitmap: ImageBitmap; sourceUrl: string },
   options: EnhanceOptions,
+  model: ModelChoice,
   signal?: AbortSignal,
 ): Promise<EnhanceResult> {
   if (pool === undefined) {
@@ -141,7 +143,7 @@ export async function runEnhance(
    */
   const plan = resolvePlan(options.level)
   if (!signal?.aborted && plan.useMl) {
-    const ml = await getMlRuntime()
+    const ml = await getMlRuntime(model)
     if (
       ml &&
       isMlAllowed(options.level, ml.backend) &&

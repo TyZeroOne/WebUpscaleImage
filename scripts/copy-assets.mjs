@@ -20,23 +20,40 @@ import { fileURLToPath } from 'node:url'
 
 const root = new URL('../', import.meta.url)
 
-/** Модель увеличивает ровно вдвое, остальные варианты пакета не нужны. */
+/** Модели увеличивают ровно вдвое, остальные варианты пакетов не нужны. */
 const MODEL_VARIANT = 'x2'
 
-const modelSource = new URL(`node_modules/@upscalerjs/esrgan-slim/models/${MODEL_VARIANT}/`, root)
-const modelTarget = new URL('public/models/esrgan-slim-x2/', root)
+/**
+ * Обе модели кладутся в пакет, чтобы пользователь мог переключаться между ними
+ * без сети. Веса x2: slim — 0.9 МБ, medium — 2.7 МБ.
+ *
+ * Третьего варианта (esrgan-thick) здесь нет намеренно: его пакет весит 120 МБ,
+ * и вариант x2 из него — порядка двух десятков мегабайт. Это больше, чем всё
+ * остальное расширение вместе взятое, ради модели, которая на машине без WebGPU
+ * всё равно неприменима по времени.
+ */
+const MODELS = ['slim', 'medium']
 
+const modelsTarget = new URL('public/models/', root)
 const wasmSource = new URL('node_modules/@tensorflow/tfjs-backend-wasm/dist/', root)
 const wasmTarget = new URL('public/wasm/', root)
 
-await rm(modelTarget, { recursive: true, force: true })
+await rm(modelsTarget, { recursive: true, force: true })
 await rm(wasmTarget, { recursive: true, force: true })
-await mkdir(modelTarget, { recursive: true })
+await mkdir(modelsTarget, { recursive: true })
 await mkdir(wasmTarget, { recursive: true })
 
-// model.json ссылается на файл весов по относительному имени, поэтому оба
-// файла обязаны лежать рядом.
-await cp(modelSource, modelTarget, { recursive: true })
+for (const model of MODELS) {
+  const source = new URL(
+    `node_modules/@upscalerjs/esrgan-${model}/models/${MODEL_VARIANT}/`,
+    root,
+  )
+  const target = new URL(`esrgan-${model}-${MODEL_VARIANT}/`, modelsTarget)
+  await mkdir(target, { recursive: true })
+  // model.json ссылается на файл весов по относительному имени, поэтому оба
+  // файла обязаны лежать рядом.
+  await cp(source, target, { recursive: true })
+}
 
 /**
  * Бинарников три: базовый, с SIMD и с SIMD+потоками. Бэкенд сам выбирает
@@ -48,5 +65,5 @@ for (const name of wasmFiles) {
 }
 
 console.log(
-  `[assets] модель esrgan-slim-${MODEL_VARIANT} и ${wasmFiles.length} .wasm скопированы в public/`,
+  `[assets] модели ${MODELS.join(', ')} (${MODEL_VARIANT}) и ${wasmFiles.length} .wasm скопированы в public/`,
 )

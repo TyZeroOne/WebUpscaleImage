@@ -4,9 +4,11 @@ import type { ProgressPanel } from '@/ui/progress-panel'
 import type { Toaster } from '@/ui/toast'
 import { hasOriginal, restoreOriginal } from './apply-result'
 import { scanMedia } from './detect'
-import { describeFailure, enhanceImageCore } from './enhance-flow'
+import { getSettings } from '@/core/settings'
+import { describeFailure, enhanceImageCore, planEnhance } from './enhance-flow'
 import { resolveConcurrency } from './enhance-runner'
 import { runQueue } from './queue'
+import { resolveQualityLevel } from './quality'
 
 /**
  * Режим «вся страница»: обработать все подходящие картинки очередью.
@@ -98,12 +100,28 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
      * обрабатывается только то, что уже загружено. Чтобы захватить больше,
      * нужно сначала прокрутить страницу.
      */
+    const settings = await getSettings()
+    const level = await resolveQualityLevel()
+
+    /**
+     * Картинки, уже подходящие под заданный размер, отсеиваются ДО очереди,
+     * а не отбраковываются внутри неё.
+     *
+     * Разница видна пользователю: в счётчике «N из M» знаменатель показывает
+     * реальный объём работы. Отбраковка внутри дала бы «40 из 40, пропущено 37» —
+     * формально верно и совершенно нечитаемо.
+     */
     const candidates = scanMedia()
       .images.filter((image) => !hasOriginal(image))
+      .filter((image) => !planEnhance(image, level, settings).skip)
       .sort(byViewportPriority)
 
     if (candidates.length === 0) {
-      return { started: false, total: 0, reason: t('pageNoImages') }
+      return {
+        started: false,
+        total: 0,
+        reason: settings.targetMode === 'longest-side' ? t('pageAllBigEnough') : t('pageNoImages'),
+      }
     }
 
     const batch = candidates.slice(0, MAX_BATCH_SIZE)

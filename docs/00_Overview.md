@@ -146,7 +146,10 @@ image-enhancer/
 | 8 | Заглушка видео-архитектуры | [09_Stage8_VideoStub_Impl.md](09_Stage8_VideoStub_Impl.md) | [09_Stage8_VideoStub_Guide.md](09_Stage8_VideoStub_Guide.md) | ✅ готов |
 | 9 | Полировка и упаковка | [10_Stage9_Packaging_Impl.md](10_Stage9_Packaging_Impl.md) | [10_Stage9_Packaging_Guide.md](10_Stage9_Packaging_Guide.md) | ✅ готов |
 
-Все девять этапов закрыты. Отдельно: [PRIVACY.md](PRIVACY.md) — политика
+| 10 | Выбор модели и целевого размера | [11_Stage10_ModelAndTarget_Impl.md](11_Stage10_ModelAndTarget_Impl.md) | [11_Stage10_ModelAndTarget_Guide.md](11_Stage10_ModelAndTarget_Guide.md) | ✅ готов |
+
+Этапы 0–9 — исходный план. Этап 10 добавлен по запросу после того, как
+расширение попробовали в работе. Отдельно: [PRIVACY.md](PRIVACY.md) — политика
 конфиденциальности для публикации.
 
 ## Исправления после этапов

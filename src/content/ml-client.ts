@@ -1,5 +1,6 @@
 import type { EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
+import type { ModelChoice } from '@/core/settings'
 import {
   ML_SCALE,
   type MlEnhanceRequest,
@@ -23,8 +24,31 @@ const log = createLogger('ml')
 
 /** Имена файлов в пакете расширения. Должны быть в web_accessible_resources. */
 const WORKER_PATH = 'ml-worker.js'
-const MODEL_PATH = 'models/esrgan-slim-x2/model.json'
 const WASM_PATH = 'wasm/'
+
+/**
+ * Доступные модели.
+ *
+ * Обе — RDN одной архитектуры с диапазоном входа 0..255, поэтому код инференса
+ * для них общий. Различаются размером сети: у slim два плотных блока с ростом 4,
+ * у medium — десять с ростом 64.
+ *
+ * Веса лежат в пакете расширения, а не скачиваются: требование проекта —
+ * никаких сетевых запросов в момент работы.
+ */
+const MODEL_PATHS: Record<ModelChoice, string> = {
+  slim: 'models/esrgan-slim-x2/model.json',
+  medium: 'models/esrgan-medium-x2/model.json',
+}
+
+/**
+ * Потолок размера входа делится на этот коэффициент для тяжёлой модели.
+ *
+ * Замер: medium считает примерно вчетверо дольше slim при том же входе.
+ * Оставить общий потолок значило бы, что переключение модели молча
+ * учетверяет ожидание на предельной картинке.
+ */
+const HEAVY_MODEL_PIXEL_DIVISOR = 4
 
 /**
  * Потолок размера входа, свой для каждого бэкенда.
@@ -49,11 +73,15 @@ const DEFAULT_MAX_INPUT_PIXELS = 150_000
 
 export interface MlRuntime {
   backend: string
+  model: ModelChoice
   maxInputPixels: number
   run(bitmap: ImageBitmap, sourceUrl: string): Promise<EnhanceResult>
+  destroy(): void
 }
 
 let runtime: Promise<MlRuntime | null> | null = null
+/** Модель, под которую поднят текущий рантайм. */
+let runtimeModel: ModelChoice | null = null
 
 /**
  * Создание воркера из файла расширения.
@@ -122,7 +150,7 @@ function waitFor<T extends MlResponse>(
 
 let nextRequestId = 1
 
-async function createRuntime(): Promise<MlRuntime | null> {
+async function createRuntime(model: ModelChoice): Promise<MlRuntime | null> {
   let worker: Worker
   try {
     worker = await spawnWorker()
@@ -138,7 +166,7 @@ async function createRuntime(): Promise<MlRuntime | null> {
 
   const init: MlInitRequest = {
     type: 'init',
-    modelUrl: absoluteUrl(MODEL_PATH),
+    modelUrl: absoluteUrl(MODEL_PATHS[model]),
     wasmBaseUrl: absoluteUrl(WASM_PATH),
     // Решение о бэкенде принимает воркер: он один может достоверно
     // проверить, поднимется ли WebGPU в его собственном контексте.
@@ -159,11 +187,17 @@ async function createRuntime(): Promise<MlRuntime | null> {
     return null
   }
 
-  log.info(`ML готов: бэкенд ${ready.backend}, загрузка ${ready.loadMs} мс`)
+  log.info(`ML готов: модель ${model}, бэкенд ${ready.backend}, загрузка ${ready.loadMs} мс`)
+
+  const basePixels = MAX_INPUT_PIXELS[ready.backend] ?? DEFAULT_MAX_INPUT_PIXELS
 
   return {
     backend: ready.backend,
-    maxInputPixels: MAX_INPUT_PIXELS[ready.backend] ?? DEFAULT_MAX_INPUT_PIXELS,
+    model,
+    maxInputPixels: model === 'medium' ? Math.round(basePixels / HEAVY_MODEL_PIXEL_DIVISOR) : basePixels,
+    destroy() {
+      worker.terminate()
+    },
 
     async run(bitmap, _sourceUrl) {
       const id = nextRequestId
@@ -192,9 +226,23 @@ async function createRuntime(): Promise<MlRuntime | null> {
   }
 }
 
-/** Готовый ML-рантайм или null, если ML на этой странице недоступен. */
-export function getMlRuntime(): Promise<MlRuntime | null> {
-  runtime ??= createRuntime().catch((error: unknown) => {
+/**
+ * Готовый ML-рантайм или null, если ML на этой странице недоступен.
+ *
+ * При смене модели старый воркер уничтожается вместе с загруженными весами.
+ * Держать оба одновременно нельзя: это удвоенная память ради переключения,
+ * которое пользователь делает раз в месяц.
+ */
+export function getMlRuntime(model: ModelChoice): Promise<MlRuntime | null> {
+  if (runtime && runtimeModel !== model) {
+    log.info(`Модель сменилась на ${model}, перезагружаю воркер`)
+    const previous = runtime
+    runtime = null
+    void previous.then((instance) => instance?.destroy())
+  }
+
+  runtimeModel = model
+  runtime ??= createRuntime(model).catch((error: unknown) => {
     log.error('Не удалось поднять ML:', error)
     return null
   })

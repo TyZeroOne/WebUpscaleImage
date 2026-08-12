@@ -14,6 +14,25 @@ const log = createLogger('settings')
 /** Что выбрал пользователь. 'auto' — пусть решает расширение по железу. */
 export type QualityPreference = QualityLevel | 'auto'
 
+/**
+ * Какая нейросеть используется.
+ *
+ * Обе — одна архитектура (RDN) и один диапазон входа, различаются размером
+ * сети: у slim два плотных блока с ростом 4, у medium — десять с ростом 64.
+ * Отсюда и разница в весах, и разница во времени.
+ */
+export type ModelChoice = 'slim' | 'medium'
+
+/**
+ * Как выбирается размер результата.
+ *
+ * 'auto'         — как раньше: коэффициент считается от того, насколько
+ *                  картинке не хватает пикселей на экране.
+ * 'longest-side' — привести длинную сторону к заданному числу. Может как
+ *                  увеличить, так и уменьшить.
+ */
+export type TargetMode = 'auto' | 'longest-side'
+
 export interface Settings {
   /** Подробные логи в консоли. Нужен, когда пользователь присылает баг-репорт. */
   verboseLogging: boolean
@@ -21,12 +40,28 @@ export interface Settings {
   quality: QualityPreference
   /** Подменять картинку прямо на странице или только предлагать скачать. */
   replaceOnPage: boolean
+  /** Какую модель использовать, когда работает нейросеть. */
+  model: ModelChoice
+  /** Как определять размер результата. */
+  targetMode: TargetMode
+  /** Желаемая длинная сторона в пикселях. Имеет смысл только при 'longest-side'. */
+  targetPx: number
+  /** Не трогать картинки, которые уже не меньше цели. */
+  skipIfLargeEnough: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   verboseLogging: false,
   quality: 'auto',
   replaceOnPage: true,
+  model: 'slim',
+  targetMode: 'auto',
+  /**
+   * 1920 — ширина распространённого монитора. Значение видно и правится
+   * пользователем; оно лишь стартовая точка, а не рекомендация.
+   */
+  targetPx: 1920,
+  skipIfLargeEnough: true,
 }
 
 /**
