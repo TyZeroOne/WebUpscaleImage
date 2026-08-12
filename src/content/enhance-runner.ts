@@ -2,8 +2,7 @@ import { createEnhancer, isMlAllowed, resolvePlan } from '@/core/enhance'
 import type { EnhanceOptions, EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
 import type { ModelChoice } from '@/core/settings'
-import { getMlRuntime, isMlApplicable } from './ml-client'
-import { ML_SCALE } from '@/workers/ml-protocol'
+import { type MlRuntime, getMlRuntime, isMlApplicable } from './ml-client'
 import { type EnhancePool, createEnhancePool } from './worker-pool'
 
 /**
@@ -68,39 +67,74 @@ async function runClassic(
 }
 
 /**
- * Разница между тем, что дала модель, и тем, что просили, — не считается
- * заслуживающей второго прохода. Пять процентов запаса на округления.
+ * Отклонение размера, которое не стоит отдельного прохода.
+ * Пять процентов — запас на округления.
  */
-const SCALE_TOLERANCE = 1.05
+const SCALE_TOLERANCE = 0.05
 
 /**
- * Дотягивание результата модели до запрошенного размера.
+ * Приведение результата модели к запрошенному размеру.
  *
- * Модель увеличивает строго вдвое. Если нужно больше — растягиваем её
- * результат классическим фильтром. Работа идёт в том же пуле воркеров,
- * то есть по-прежнему вне главного потока.
+ * МОДЕЛЬ ЗАПУСКАЕТСЯ СТОЛЬКО РАЗ, СКОЛЬКО ПОМЕЩАЕТСЯ.
+ *
+ * Раньше здесь был один проход модели плюс Ланцош на всё остальное.
+ * Для двукратной модели при запросе в четыре раза это означало, что половину
+ * работы делает фильтр — то есть просто размывает то, что модель восстановила.
+ * Повторный прогон модели по её же результату даёт заметно больше деталей:
+ * на втором проходе она работает с уже восстановленной картинкой, а не
+ * с исходной мелкой.
+ *
+ * Остаток после целого числа проходов доводится Ланцошем — в любую сторону.
+ * Уменьшение здесь не потеря, а передискретизация с запасом: модель посчитала
+ * больше пикселей, чем нужно, и усреднение их даёт результат чище, чем
+ * попадание точно в цель.
  */
 async function finishScaling(
-  enhanced: EnhanceResult,
+  first: EnhanceResult,
   sourceUrl: string,
   options: EnhanceOptions,
+  ml: MlRuntime,
   signal?: AbortSignal,
 ): Promise<EnhanceResult> {
-  const remaining = options.scale / ML_SCALE
-  if (remaining <= SCALE_TOLERANCE) return enhanced
+  let current = first
+  let achieved = ml.scale
+  let totalMs = first.durationMs
 
-  const bitmap = await createImageBitmap(enhanced.blob)
+  /**
+   * Дополнительные проходы модели, пока до цели остаётся не меньше её
+   * собственного коэффициента. Ограничение сверху — потолок размера входа:
+   * результат предыдущего прохода уже крупнее исходника во столько же раз.
+   */
+  while (options.scale / achieved >= ml.scale - SCALE_TOLERANCE) {
+    const bitmap = await createImageBitmap(current.blob)
+    if (bitmap.width * bitmap.height > ml.maxInputPixels) {
+      bitmap.close()
+      log.debug('Ещё один проход модели не помещается в потолок размера')
+      break
+    }
+    log.debug(`Дополнительный проход модели: ${achieved}x -> ${achieved * ml.scale}x`)
+    const next = await ml.run(bitmap, sourceUrl)
+    current = next
+    achieved *= ml.scale
+    totalMs += next.durationMs
+  }
+
+  const remaining = options.scale / achieved
+  if (Math.abs(remaining - 1) <= SCALE_TOLERANCE) {
+    return { ...current, durationMs: totalMs }
+  }
+
+  const bitmap = await createImageBitmap(current.blob)
   const finished = await runClassic({ bitmap, sourceUrl }, { ...options, scale: remaining }, signal)
 
   return {
     ...finished,
     /**
      * Бэкендом считается модель: именно она определила качество результата,
-     * а второй проход только растянул уже восстановленное. Время суммируется —
-     * пользователь ждал оба прохода.
+     * а последний проход только привёл размер к запрошенному.
      */
-    backend: enhanced.backend,
-    durationMs: enhanced.durationMs + finished.durationMs,
+    backend: current.backend,
+    durationMs: totalMs + finished.durationMs,
   }
 }
 
@@ -151,7 +185,7 @@ export async function runEnhance(
     ) {
       try {
         const enhanced = await ml.run(input.bitmap, input.sourceUrl)
-        return await finishScaling(enhanced, input.sourceUrl, options, signal)
+        return await finishScaling(enhanced, input.sourceUrl, options, ml, signal)
       } catch (error) {
         // Картинка уже передана воркеру — откатиться на классику нельзя.
         log.error('ML-обработка не удалась:', error)

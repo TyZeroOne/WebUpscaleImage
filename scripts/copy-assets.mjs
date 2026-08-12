@@ -20,19 +20,20 @@ import { fileURLToPath } from 'node:url'
 
 const root = new URL('../', import.meta.url)
 
-/** Модели увеличивают ровно вдвое, остальные варианты пакетов не нужны. */
-const MODEL_VARIANT = 'x2'
-
 /**
- * Обе модели кладутся в пакет, чтобы пользователь мог переключаться между ними
- * без сети. Веса x2: slim — 0.9 МБ, medium — 2.7 МБ.
+ * Все три модели кладутся в пакет, чтобы переключение шло без сети.
+ * Веса: slim — 0.9 МБ, medium — 2.7 МБ, gans — 4.5 МБ.
  *
- * Третьего варианта (esrgan-thick) здесь нет намеренно: его пакет весит 120 МБ,
- * и вариант x2 из него — порядка двух десятков мегабайт. Это больше, чем всё
- * остальное расширение вместе взятое, ради модели, которая на машине без WebGPU
- * всё равно неприменима по времени.
+ * Варианта esrgan-thick здесь нет намеренно: его пакет весит 120 МБ,
+ * а нужная часть — порядка двух десятков мегабайт. Это больше, чем всё
+ * остальное расширение вместе взятое, ради модели, которая на машине
+ * без WebGPU всё равно неприменима по времени.
  */
-const MODELS = ['slim', 'medium']
+const MODELS = [
+  { pkg: 'esrgan-slim', variant: 'x2', out: 'esrgan-slim-x2' },
+  { pkg: 'esrgan-medium', variant: 'x2', out: 'esrgan-medium-x2' },
+  { pkg: 'esrgan-legacy', variant: 'gans', out: 'esrgan-gans-x4' },
+]
 
 const modelsTarget = new URL('public/models/', root)
 const wasmSource = new URL('node_modules/@tensorflow/tfjs-backend-wasm/dist/', root)
@@ -44,11 +45,8 @@ await mkdir(modelsTarget, { recursive: true })
 await mkdir(wasmTarget, { recursive: true })
 
 for (const model of MODELS) {
-  const source = new URL(
-    `node_modules/@upscalerjs/esrgan-${model}/models/${MODEL_VARIANT}/`,
-    root,
-  )
-  const target = new URL(`esrgan-${model}-${MODEL_VARIANT}/`, modelsTarget)
+  const source = new URL(`node_modules/@upscalerjs/${model.pkg}/models/${model.variant}/`, root)
+  const target = new URL(`${model.out}/`, modelsTarget)
   await mkdir(target, { recursive: true })
   // model.json ссылается на файл весов по относительному имени, поэтому оба
   // файла обязаны лежать рядом.
@@ -65,5 +63,5 @@ for (const name of wasmFiles) {
 }
 
 console.log(
-  `[assets] модели ${MODELS.join(', ')} (${MODEL_VARIANT}) и ${wasmFiles.length} .wasm скопированы в public/`,
+  `[assets] модели ${MODELS.map((m) => m.out).join(', ')} и ${wasmFiles.length} .wasm скопированы в public/`,
 )

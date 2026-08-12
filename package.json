@@ -23,6 +23,7 @@
     "@tensorflow/tfjs-backend-webgpu": "^4.22.0",
     "@tensorflow/tfjs-core": "^4.22.0",
     "@tensorflow/tfjs-layers": "^4.22.0",
+    "@upscalerjs/esrgan-legacy": "^1.0.0",
     "@upscalerjs/esrgan-medium": "^1.0.0",
     "@upscalerjs/esrgan-slim": "^1.0.0"
   }

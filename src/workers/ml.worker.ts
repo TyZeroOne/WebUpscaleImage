@@ -1,22 +1,22 @@
 import * as tf from '@tensorflow/tfjs-core'
-import { type LayersModel, loadLayersModel } from '@tensorflow/tfjs-layers'
+import { type LayersModel, layers as tfLayers, loadLayersModel } from '@tensorflow/tfjs-layers'
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm'
 import '@tensorflow/tfjs-backend-webgpu'
-import {
-  ML_SCALE,
-  type MlEnhanceRequest,
-  type MlInitRequest,
-  type MlRequest,
-  type MlResponse,
+import type {
+  MlEnhanceRequest,
+  MlInitRequest,
+  MlModelSpec,
+  MlRequest,
+  MlResponse,
 } from './ml-protocol'
 
 /**
  * ML-апскейл на TensorFlow.js.
  *
- * Модель — ESRGAN-slim x2 из пакета @upscalerjs/esrgan-slim (MIT). Она
- * полностью свёрточная (вход [batch, null, null, 3]), поэтому принимает
- * картинку любого размера, а увеличение вдвое зашито в архитектуру
- * последним слоем PixelShuffle.
+ * Воркер не привязан к одной модели: всё, что их различает — коэффициент
+ * увеличения, диапазон входа, наличие самописных слоёв, размер плитки —
+ * приходит в запросе init. Общее у всех одно: полностью свёрточная сеть
+ * с входом [batch, null, null, 3], принимающая картинку любого размера.
  *
  * Воркер собирается ОТДЕЛЬНОЙ конфигурацией (vite.mlworker.config.ts)
  * в самостоятельный файл dist/ml-worker.js, а не встраивается в content.js.
@@ -38,47 +38,75 @@ import {
 const WARMUP_SIZE = 16
 
 /**
- * Сторона плитки, на которые режется картинка перед инференсом.
+ * САМОПИСНЫЕ СЛОИ.
  *
- * 224 подобрано по замерам: с полями получается вход не больше 272×272
- * (74 тысячи пикселей), а падать WebGPU начинал при 691 тысяче. Запас
- * шестикратный — на другие видеокарты с более строгими лимитами.
+ * Нужны не всем моделям. У RDN-вариантов (slim, medium) в model.json только
+ * стандартные слои. У RRDN-варианта их два вида: MultiplyBeta встречается
+ * сорок раз, PixelShuffle — один. Без регистрации ДО загрузки
+ * loadLayersModel падает с «Unknown layer: MultiplyBeta».
  *
- * Меньше делать невыгодно: у каждого вызова модели есть постоянные
- * накладные расходы, и на WebGPU они заметно больше самих вычислений
- * (замер: 120 тыс. пикселей — 164 мс, 307 тыс. — 189 мс, то есть
- * двукратный рост объёма стоил 15% времени).
+ * Реализация обязана повторять оригинал из пакета @upscalerjs: веса обучены
+ * под конкретную математику, и другая даст визуальный мусор при формально
+ * успешной загрузке.
  */
-const TILE_SIZE = 224
+
+/** Коэффициент масштабирования остаточных блоков в ESRGAN. */
+const RESIDUAL_BETA = 0.2
+
+function firstInput(inputs: tf.Tensor | tf.Tensor[]): tf.Tensor {
+  return Array.isArray(inputs) ? (inputs[0] as tf.Tensor) : inputs
+}
+
+class MultiplyBeta extends tfLayers.Layer {
+  static className = 'MultiplyBeta'
+
+  override call(inputs: tf.Tensor | tf.Tensor[]): tf.Tensor {
+    return tf.mul(firstInput(inputs), RESIDUAL_BETA)
+  }
+}
 
 /**
- * Ширина полей вокруг плитки, которые считаются и выбрасываются.
- *
- * Свёртки с padding='same' у края плитки видят «обрыв» изображения
- * и достраивают его нулями — результат у границы искажается. Без полей
- * эти искажения сложились бы в видимую сетку по стыкам.
- *
- * Величина определяется рецептивным полем сети: у ESRGAN-slim около
- * десятка свёрток 3×3, каждая расширяет зону влияния на 1 пиксель
- * в каждую сторону, итого ~10-12. Взято 24 — двойной запас.
+ * Имя класса включает коэффициент: в model.json слой записан как
+ * PixelShuffle4x, и регистрировать его надо ровно под этим именем.
+ * Поэтому класс создаётся фабрикой, а не пишется один раз.
  */
-const TILE_OVERLAP = 24
+/*
+ * Тип возвращаемого класса выводится, а не пишется явно: аннотация
+ * `typeof Layer` теряет статическое поле className, без которого
+ * registerClass не принимает класс.
+ */
+function createPixelShuffle(scale: number) {
+  class PixelShuffle extends tfLayers.Layer {
+    static className = `PixelShuffle${scale}x`
 
-/**
- * КАСТОМНЫХ СЛОЁВ ЗДЕСЬ НЕТ — и это выяснилось не сразу.
- *
- * Пакет @upscalerjs/esrgan-slim умеет две архитектуры. Для собственно
- * ESRGAN он регистрирует два самописных слоя (MultiplyBeta и PixelShuffle),
- * без которых loadLayersModel падает с «Unknown layer». Но вариант x2,
- * который мы используем, объявлен как architecture: 'rdn', и в его
- * model.json таких слоёв нет: только Conv2D, Add, Concatenate, Activation
- * и UpSampling2D — всё из стандартного набора TensorFlow.js.
- *
- * Если однажды модель поменяется на не-RDN, слои придётся описать
- * и зарегистрировать через tf.serialization.registerClass ДО загрузки.
- */
+    override computeOutputShape(inputShape: number[] | number[][]): number[] {
+      const shape = (Array.isArray(inputShape[0]) ? inputShape[0] : inputShape) as number[]
+      return [shape[0] as number, shape[1] as number, shape[2] as number, 3]
+    }
+
+    override call(inputs: tf.Tensor | tf.Tensor[]): tf.Tensor {
+      // depthToSpace — то, что в статьях называется sub-pixel convolution:
+      // каналы «разворачиваются» в пространственное разрешение.
+      return tf.depthToSpace(firstInput(inputs) as tf.Tensor4D, scale, 'NHWC')
+    }
+  }
+  return PixelShuffle
+}
+
+const registeredLayers = new Set<string>()
+
+function registerCustomLayers(scale: number): void {
+  const key = `x${scale}`
+  if (registeredLayers.has(key)) return
+  // Повторная регистрация того же класса в TensorFlow.js — ошибка,
+  // а воркер переиспользуется при смене модели.
+  if (!registeredLayers.size) tf.serialization.registerClass(MultiplyBeta)
+  tf.serialization.registerClass(createPixelShuffle(scale))
+  registeredLayers.add(key)
+}
 
 let model: LayersModel | null = null
+let spec: MlModelSpec | null = null
 let activeBackend = ''
 
 /**
@@ -127,13 +155,16 @@ async function warmUp(loaded: LayersModel): Promise<void> {
 async function init(request: MlInitRequest): Promise<MlResponse> {
   const startedAt = performance.now()
   try {
+    spec = request.model
+    if (spec.customLayers) registerCustomLayers(spec.scale)
     activeBackend = await selectBackend(request)
-    model = await loadLayersModel(request.modelUrl)
+    model = await loadLayersModel(spec.url)
     await warmUp(model)
     return {
       type: 'ready',
       backend: activeBackend,
       loadMs: Math.round(performance.now() - startedAt),
+      scale: spec.scale,
     }
   } catch (error) {
     return { type: 'init-failed', error: error instanceof Error ? error.message : String(error) }
@@ -152,29 +183,33 @@ async function init(request: MlInitRequest): Promise<MlResponse> {
  * плитка оставляла бы в памяти десятки буферов.
  */
 async function inferTile(tile: ImageData): Promise<Uint8ClampedArray> {
+  const inputMax = spec?.inputMax ?? 255
+
   const output = tf.tidy(() => {
     /**
-     * ДИАПАЗОН ВХОДА — 0..255, а не 0..1.
+     * ДИАПАЗОН ВХОДА — свойство конкретной модели, а не общее правило.
      *
-     * Это свойство конкретной модели, а не общее правило: в исходниках
-     * @upscalerjs/esrgan-slim у архитектуры 'rdn' объявлено
-     * inputRange: [0, 255], тогда как у собственно ESRGAN — [0, 1].
-     * Пакет называется esrgan-slim, но веса внутри — RDN (это видно
-     * и по именам слоёв в model.json: RDB_Concat, LFF, GFF, LRL).
+     * У RDN-вариантов (slim, medium) он 0..255, у RRDN — 0..1. Это записано
+     * в исходниках пакета @upscalerjs и никак не следует из самих весов.
      *
      * Ошибка здесь НЕ даёт очевидного мусора, и это самое коварное:
-     * у RDN есть глобальный residual, и при заниженном в 255 раз входе
-     * сеть вырождается примерно в обычное растяжение. Картинка выглядит
-     * нормально, средний цвет сохраняется — просто модель не работает.
+     * у обеих архитектур есть глобальный residual, и при неверно
+     * отмасштабированном входе сеть вырождается примерно в обычное
+     * растяжение. Картинка выглядит нормально, средний цвет сохраняется —
+     * просто модель не работает. Подробный разбор — в гайде этапа 5.
      */
     const pixels = tf.browser.fromPixels(tile)
-    const batched = tf.expandDims(tf.cast(pixels, 'float32'), 0)
+    const scaled =
+      inputMax === 255
+        ? tf.cast(pixels, 'float32')
+        : tf.div(tf.cast(pixels, 'float32'), 255 / inputMax)
+    const batched = tf.expandDims(scaled, 0)
     const predicted = model!.predict(batched) as tf.Tensor
-    // Сеть может выдать значения за пределами 0..255, и без обрезки
+    // Сеть может выдать значения за пределами диапазона, и без обрезки
     // они завернулись бы при переводе в байты.
-    const clipped = tf.clipByValue(tf.squeeze(predicted, [0]), 0, 255)
+    const clipped = tf.clipByValue(tf.squeeze(predicted, [0]), 0, inputMax)
     // toPixels ожидает float в 0..1 либо int32 в 0..255.
-    return tf.div(clipped, 255) as tf.Tensor3D
+    return tf.div(clipped, inputMax) as tf.Tensor3D
   })
 
   const pixels = await tf.browser.toPixels(output)
@@ -196,10 +231,11 @@ async function inferTile(tile: ImageData): Promise<Uint8ClampedArray> {
  * фиксированы и не зависят от размера картинки.
  */
 async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
-  if (!model) return { type: 'failed', id: request.id, error: 'Модель не загружена' }
+  if (!model || !spec) return { type: 'failed', id: request.id, error: 'Модель не загружена' }
 
   const startedAt = performance.now()
   const source = request.bitmap
+  const { scale, tileSize: TILE_SIZE, tileOverlap: TILE_OVERLAP } = spec
   try {
     const width = source.width
     const height = source.height
@@ -209,7 +245,7 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
     if (!sourceContext) throw new Error('Не удалось получить контекст 2d')
     sourceContext.drawImage(source, 0, 0)
 
-    const outCanvas = new OffscreenCanvas(width * ML_SCALE, height * ML_SCALE)
+    const outCanvas = new OffscreenCanvas(width * scale, height * scale)
     const outContext = outCanvas.getContext('2d')
     if (!outContext) throw new Error('Не удалось получить контекст 2d')
 
@@ -234,8 +270,8 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
         // требует буфер строго типа ArrayBuffer, а toPixels возвращает массив
         // поверх ArrayBufferLike, и типы не сходятся.
         const resultData = outContext.createImageData(
-          paddedWidth * ML_SCALE,
-          paddedHeight * ML_SCALE,
+          paddedWidth * scale,
+          paddedHeight * scale,
         )
         resultData.data.set(resultPixels)
 
@@ -248,12 +284,12 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
          */
         outContext.putImageData(
           resultData,
-          (x - padLeft) * ML_SCALE,
-          (y - padTop) * ML_SCALE,
-          padLeft * ML_SCALE,
-          padTop * ML_SCALE,
-          tileWidth * ML_SCALE,
-          tileHeight * ML_SCALE,
+          (x - padLeft) * scale,
+          (y - padTop) * scale,
+          padLeft * scale,
+          padTop * scale,
+          tileWidth * scale,
+          tileHeight * scale,
         )
       }
     }
@@ -264,8 +300,8 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
       type: 'done',
       id: request.id,
       blob,
-      width: width * ML_SCALE,
-      height: height * ML_SCALE,
+      width: width * scale,
+      height: height * scale,
       durationMs: Math.round(performance.now() - startedAt),
       backend: activeBackend,
     }

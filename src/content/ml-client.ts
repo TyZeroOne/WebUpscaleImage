@@ -2,7 +2,7 @@ import type { EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
 import type { ModelChoice } from '@/core/settings'
 import {
-  ML_SCALE,
+  ML_MIN_SCALE,
   type MlEnhanceRequest,
   type MlInitRequest,
   type MlResponse,
@@ -29,26 +29,83 @@ const WASM_PATH = 'wasm/'
 /**
  * Доступные модели.
  *
- * Обе — RDN одной архитектуры с диапазоном входа 0..255, поэтому код инференса
- * для них общий. Различаются размером сети: у slim два плотных блока с ростом 4,
- * у medium — десять с ростом 64.
- *
  * Веса лежат в пакете расширения, а не скачиваются: требование проекта —
  * никаких сетевых запросов в момент работы.
+ *
+ * ЧЕМ ОНИ РАЗЛИЧАЮТСЯ, КРОМЕ РАЗМЕРА
+ *
+ * slim и medium — архитектура RDN, вход 0..255, стандартные слои, увеличение
+ * вдвое. Различаются глубиной: 2 плотных блока против 10.
+ *
+ * detailed — архитектура RRDN и совсем другая модель: 477 слоёв против 24,
+ * вход 0..1, два вида самописных слоёв, увеличение сразу вчетверо. Главное
+ * же отличие не в размере: она обучена как GAN, то есть на правдоподобие,
+ * а не на среднеквадратичную ошибку. RDN-модели оптимизированы под PSNR
+ * и потому склонны к сглаживанию — отсюда ощущение «мыла». GAN синтезирует
+ * текстуру, из-за чего результат выглядит резче, но детали местами
+ * придуманы, а не восстановлены.
  */
-const MODEL_PATHS: Record<ModelChoice, string> = {
-  slim: 'models/esrgan-slim-x2/model.json',
-  medium: 'models/esrgan-medium-x2/model.json',
+interface ModelRegistryEntry {
+  path: string
+  scale: number
+  inputMax: number
+  customLayers: boolean
+  tileSize: number
+  tileOverlap: number
+  /** Во сколько раз снижается потолок размера входа относительно базового. */
+  pixelDivisor: number
 }
 
-/**
- * Потолок размера входа делится на этот коэффициент для тяжёлой модели.
- *
- * Замер: medium считает примерно вчетверо дольше slim при том же входе.
- * Оставить общий потолок значило бы, что переключение модели молча
- * учетверяет ожидание на предельной картинке.
- */
-const HEAVY_MODEL_PIXEL_DIVISOR = 4
+const MODELS: Record<ModelChoice, ModelRegistryEntry> = {
+  slim: {
+    path: 'models/esrgan-slim-x2/model.json',
+    scale: 2,
+    inputMax: 255,
+    customLayers: false,
+    /**
+     * 224 подобрано по замерам: с полями вход не больше 272×272 (74 тысячи
+     * пикселей), а падать WebGPU начинал при 691 тысяче. Мельче делать
+     * невыгодно — у каждого вызова модели есть постоянные накладные расходы.
+     */
+    tileSize: 224,
+    /** Рецептивное поле: ~10 пикселей у сети из десятка свёрток 3×3. Запас двойной. */
+    tileOverlap: 24,
+    pixelDivisor: 1,
+  },
+  medium: {
+    path: 'models/esrgan-medium-x2/model.json',
+    scale: 2,
+    inputMax: 255,
+    customLayers: false,
+    tileSize: 224,
+    tileOverlap: 24,
+    /** Замер: вдвое дольше slim на мелкой картинке, разрыв растёт с размером. */
+    pixelDivisor: 4,
+  },
+  detailed: {
+    path: 'models/esrgan-gans-x4/model.json',
+    scale: 4,
+    /** RRDN обучена на диапазоне 0..1, в отличие от RDN-вариантов. */
+    inputMax: 1,
+    customLayers: true,
+    /**
+     * Плитка вчетверо меньше по площади, чем у двукратных моделей.
+     *
+     * Причина не в глубине сети, а в коэффициенте: при увеличении вчетверо
+     * выходная плитка со стороной 128 — это уже 512 пикселей, то есть
+     * 260 тысяч на выходе. Со стороной 224 вышло бы 800 тысяч, и вычислительная
+     * сетка WebGPU снова упёрлась бы в лимит устройства.
+     */
+    tileSize: 128,
+    /**
+     * Поля шире: 477 слоёв против 24, и рецептивное поле соответственно
+     * больше. Точный расчёт по такой топологии трудоёмок, поэтому взято
+     * значение с большим запасом и проверено замером швов.
+     */
+    tileOverlap: 40,
+    pixelDivisor: 8,
+  },
+}
 
 /**
  * Потолок размера входа, свой для каждого бэкенда.
@@ -74,6 +131,8 @@ const DEFAULT_MAX_INPUT_PIXELS = 150_000
 export interface MlRuntime {
   backend: string
   model: ModelChoice
+  /** Во сколько раз увеличивает загруженная модель. */
+  scale: number
   maxInputPixels: number
   run(bitmap: ImageBitmap, sourceUrl: string): Promise<EnhanceResult>
   destroy(): void
@@ -164,9 +223,17 @@ async function createRuntime(model: ModelChoice): Promise<MlRuntime | null> {
     return null
   }
 
+  const entry = MODELS[model]
   const init: MlInitRequest = {
     type: 'init',
-    modelUrl: absoluteUrl(MODEL_PATHS[model]),
+    model: {
+      url: absoluteUrl(entry.path),
+      scale: entry.scale,
+      inputMax: entry.inputMax,
+      customLayers: entry.customLayers,
+      tileSize: entry.tileSize,
+      tileOverlap: entry.tileOverlap,
+    },
     wasmBaseUrl: absoluteUrl(WASM_PATH),
     // Решение о бэкенде принимает воркер: он один может достоверно
     // проверить, поднимется ли WebGPU в его собственном контексте.
@@ -194,7 +261,8 @@ async function createRuntime(model: ModelChoice): Promise<MlRuntime | null> {
   return {
     backend: ready.backend,
     model,
-    maxInputPixels: model === 'medium' ? Math.round(basePixels / HEAVY_MODEL_PIXEL_DIVISOR) : basePixels,
+    scale: ready.scale,
+    maxInputPixels: Math.round(basePixels / entry.pixelDivisor),
     destroy() {
       worker.terminate()
     },
@@ -273,7 +341,14 @@ export function isMlApplicable(
   requestedScale: number,
 ): boolean {
   if (bitmapWidth * bitmapHeight > mlRuntime.maxInputPixels) return false
-  // Ниже полутора крат модель дала бы больше, чем просили, и результат
-  // пришлось бы уменьшать — бессмысленная работа.
-  return requestedScale >= ML_SCALE - 0.5
+  /**
+   * Ниже полутора крат звать модель незачем: она увеличит сильнее, чем
+   * просили, и результат придётся уменьшать — самая дорогая часть пайплайна
+   * ради работы, которую тут же частично отменят.
+   *
+   * Выше — можно всегда, даже если модель увеличивает больше нужного:
+   * лишнее уберёт уменьшение, а это ещё и передискретизация с запасом,
+   * то есть результат чище, чем при точном попадании.
+   */
+  return requestedScale >= ML_MIN_SCALE
 }

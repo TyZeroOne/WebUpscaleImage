@@ -143,9 +143,13 @@
   "modelSlimHint": {
     "message": "0.9 MB of weights. Fast: about 0.1 s for a 600×400 image on WebGPU. Moderate improvement."
   },
-  "modelMedium": { "message": "Heavy (ESRGAN-medium)" },
+  "modelMedium": { "message": "Medium (ESRGAN-medium)" },
   "modelMediumHint": {
-    "message": "2.7 MB of weights, roughly three times the network. Noticeably more detail, but several times slower; the image size limit for it is four times lower. Not recommended without WebGPU."
+    "message": "2.7 MB of weights, roughly three times deeper. Slightly more detail, twice as slow; the image size limit is four times lower."
+  },
+  "modelDetailed": { "message": "Detailed (ESRGAN GAN, ×4)" },
+  "modelDetailedHint": {
+    "message": "4.5 MB of weights, 477 layers, upscales fourfold in one pass. GAN-trained: it synthesises texture instead of smoothing, so there is far less blur. In exchange it is the slowest, the image size limit is eight times lower, and some fine detail is invented rather than recovered. Not recommended without WebGPU."
   },
 
   "sectionTarget": { "message": "Output size" },
