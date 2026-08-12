@@ -2,6 +2,7 @@ import { createEnhancer, isMlAllowed, resolvePlan } from '@/core/enhance'
 import type { EnhanceOptions, EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
 import { getMlRuntime, isMlApplicable } from './ml-client'
+import { ML_SCALE } from '@/workers/ml-protocol'
 import { type EnhancePool, createEnhancePool } from './worker-pool'
 
 /**
@@ -37,6 +38,71 @@ export function resolveConcurrency(): number {
   return pool ? pool.size : 1
 }
 
+/**
+ * Классический апскейл: в воркере, а при их недоступности — в потоке страницы.
+ *
+ * Вынесено отдельной функцией, потому что вызывается из двух мест: как основной
+ * путь и как второй проход поверх результата модели.
+ */
+async function runClassic(
+  input: { bitmap: ImageBitmap; sourceUrl: string },
+  options: EnhanceOptions,
+  signal?: AbortSignal,
+): Promise<EnhanceResult> {
+  if (pool) {
+    /**
+     * Отката на вычисления в потоке страницы здесь НЕТ, и это осознанно.
+     * Картинка уже передана воркеру вместе с владением: в этом потоке
+     * она отсоединена, и повторить работу не на чем. Откат возможен только
+     * до отправки — то есть на уровне «пул вообще не создался».
+     */
+    return pool.run(input, options, signal)
+  }
+
+  try {
+    return await createEnhancer(options.level).enhance(input, options, signal)
+  } finally {
+    input.bitmap.close()
+  }
+}
+
+/**
+ * Разница между тем, что дала модель, и тем, что просили, — не считается
+ * заслуживающей второго прохода. Пять процентов запаса на округления.
+ */
+const SCALE_TOLERANCE = 1.05
+
+/**
+ * Дотягивание результата модели до запрошенного размера.
+ *
+ * Модель увеличивает строго вдвое. Если нужно больше — растягиваем её
+ * результат классическим фильтром. Работа идёт в том же пуле воркеров,
+ * то есть по-прежнему вне главного потока.
+ */
+async function finishScaling(
+  enhanced: EnhanceResult,
+  sourceUrl: string,
+  options: EnhanceOptions,
+  signal?: AbortSignal,
+): Promise<EnhanceResult> {
+  const remaining = options.scale / ML_SCALE
+  if (remaining <= SCALE_TOLERANCE) return enhanced
+
+  const bitmap = await createImageBitmap(enhanced.blob)
+  const finished = await runClassic({ bitmap, sourceUrl }, { ...options, scale: remaining }, signal)
+
+  return {
+    ...finished,
+    /**
+     * Бэкендом считается модель: именно она определила качество результата,
+     * а второй проход только растянул уже восстановленное. Время суммируется —
+     * пользователь ждал оба прохода.
+     */
+    backend: enhanced.backend,
+    durationMs: enhanced.durationMs + finished.durationMs,
+  }
+}
+
 export async function runEnhance(
   input: { bitmap: ImageBitmap; sourceUrl: string },
   options: EnhanceOptions,
@@ -57,8 +123,13 @@ export async function runEnhance(
    *    на WebGPU: на WASM он стоил бы секунды и перестал бы быть
    *    компромиссом);
    *  - размер входа в пределах потолка бэкенда;
-   *  - запрошенное увеличение близко к двукратному — это архитектура
-   *    модели, а не настройка.
+   *  - увеличение не меньше полутора крат.
+   *
+   * Модель увеличивает ровно вдвое — это её архитектура, а не параметр.
+   * Если запрошено больше, недостающее дотягивается Ланцошем ПОВЕРХ
+   * результата модели. Это принципиально лучше, чем Ланцош от оригинала:
+   * детали, которых в исходнике не было, к этому моменту уже восстановлены,
+   * и второй проход лишь растягивает уже восстановленное.
    *
    * Отмена на ML не распространяется: единственный воркер держит
    * загруженную модель, и terminate() выбросил бы её вместе с секундой
@@ -77,7 +148,8 @@ export async function runEnhance(
       isMlApplicable(ml, input.bitmap.width, input.bitmap.height, options.scale)
     ) {
       try {
-        return await ml.run(input.bitmap, input.sourceUrl)
+        const enhanced = await ml.run(input.bitmap, input.sourceUrl)
+        return await finishScaling(enhanced, input.sourceUrl, options, signal)
       } catch (error) {
         // Картинка уже передана воркеру — откатиться на классику нельзя.
         log.error('ML-обработка не удалась:', error)
@@ -86,19 +158,5 @@ export async function runEnhance(
     }
   }
 
-  if (pool) {
-    /**
-     * Отката на вычисления в потоке страницы здесь НЕТ, и это осознанно.
-     * Картинка уже передана воркеру вместе с владением: в этом потоке
-     * она отсоединена, и повторить работу не на чем. Откат возможен только
-     * до отправки — то есть на уровне «пул вообще не создался».
-     */
-    return pool.run(input, options, signal)
-  }
-
-  try {
-    return await createEnhancer(options.level).enhance(input, options, signal)
-  } finally {
-    input.bitmap.close()
-  }
+  return runClassic(input, options, signal)
 }
