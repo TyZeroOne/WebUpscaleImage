@@ -1,3 +1,4 @@
+import type { EnhanceOperation } from '@/core/enhance'
 import { t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import type { ProgressPanel } from '@/ui/progress-panel'
@@ -83,7 +84,9 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
     toaster.show(t('pageRestored', restored))
   })
 
-  return async function enhancePage(): Promise<PageFlowStartResult> {
+  return async function enhancePage(
+    operation: EnhanceOperation = 'upscale',
+  ): Promise<PageFlowStartResult> {
     if (controller) {
       return { started: false, total: 0, reason: t('pageBusy') }
     }
@@ -113,7 +116,7 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
      */
     const candidates = scanMedia()
       .images.filter((image) => !hasOriginal(image))
-      .filter((image) => !planEnhance(image, level, settings).skip)
+      .filter((image) => !planEnhance(image, level, settings, operation).skip)
       .sort(byViewportPriority)
 
     if (candidates.length === 0) {
@@ -139,7 +142,7 @@ export function createPageFlow({ panel, toaster }: PageFlowDeps) {
     // чтобы popup успел закрыться, а очередь продолжила работать.
     void (async () => {
       const tasks = batch.map((image) => async (signal: AbortSignal) => {
-        const outcome = await enhanceImageCore(image, 'page', signal)
+        const outcome = await enhanceImageCore(image, 'page', operation, signal)
         processed.push(image)
         return outcome
       })

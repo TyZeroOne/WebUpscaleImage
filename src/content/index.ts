@@ -3,7 +3,7 @@ import { createLogger, setVerboseLogging } from '@/core/log'
 import { registerMessageHandlers, sendToBackground } from '@/core/messaging'
 import { getSettings } from '@/core/settings'
 import { createHighlight } from '@/ui/highlight'
-import { createOverlayButton } from '@/ui/overlay-button'
+import { createOverlayActions } from '@/ui/overlay-actions'
 import { createProgressPanel } from '@/ui/progress-panel'
 import { createToaster } from '@/ui/toast'
 import { createVideoBadge } from '@/ui/video-badge'
@@ -33,7 +33,7 @@ const HIGHLIGHT_DURATION_MS = 1600
 
 function bootstrapUi(): void {
   const { host, layer } = getUiRoot()
-  const button = createOverlayButton(layer)
+  const actions = createOverlayActions(layer)
   const toaster = createToaster(layer)
   const highlight = createHighlight(layer)
   const panel = createProgressPanel(layer)
@@ -42,7 +42,7 @@ function bootstrapUi(): void {
   let hovered: HTMLImageElement | null = null
 
   createHoverTracker({
-    button,
+    actions,
     badge,
     host,
     onChange: (target) => {
@@ -59,9 +59,9 @@ function bootstrapUi(): void {
   const enhanceImage = createEnhanceFlow({ toaster })
   const enhancePage = createPageFlow({ panel, toaster })
 
-  button.onClick(() => {
+  actions.onAction((operation) => {
     if (!hovered) return
-    void enhanceImage(hovered, 'overlay')
+    void enhanceImage(hovered, 'overlay', operation)
   })
 
   // Контекстное меню приходит из service worker'а: сам пункт меню живёт там,
@@ -76,7 +76,7 @@ function bootstrapUi(): void {
         return { handled: false }
       }
       highlight.showFor(image.getBoundingClientRect(), HIGHLIGHT_DURATION_MS)
-      await enhanceImage(image, 'context-menu')
+      await enhanceImage(image, 'context-menu', payload.operation)
       return { handled: true }
     },
 
@@ -85,8 +85,8 @@ function bootstrapUi(): void {
       return { url: location.href, images: media.images.length, videos: media.videos.length }
     },
 
-    ENHANCE_PAGE: async () => {
-      const result = await enhancePage()
+    ENHANCE_PAGE: async (payload) => {
+      const result = await enhancePage(payload.operation)
       if (!result.started && result.reason) {
         toaster.show(result.reason, { tone: 'error' })
       }

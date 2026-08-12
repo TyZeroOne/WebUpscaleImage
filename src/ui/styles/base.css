@@ -148,6 +148,14 @@ button.ie-primary:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
+/* Второе действие равноправно по важности, но визуально спокойнее:
+   две одинаково яркие кнопки подряд не дают понять, что выбрать. */
+button.ie-secondary {
+  border-color: var(--ie-accent);
+  background: transparent;
+  color: var(--ie-accent);
+}
+
 label.ie-check {
   display: flex;
   align-items: flex-start;

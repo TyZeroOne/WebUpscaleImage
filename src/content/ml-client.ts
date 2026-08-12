@@ -54,6 +54,28 @@ interface ModelRegistryEntry {
   tileOverlap: number
   /** Во сколько раз снижается потолок размера входа относительно базового. */
   pixelDivisor: number
+  /**
+   * Синтезирует ли модель новые детали.
+   *
+   * Различие решает, годится ли модель для улучшения качества БЕЗ изменения
+   * размера. Там картинка прогоняется через модель с увеличением и возвращается
+   * к исходному размеру уменьшением, и выигрыш возможен, только если модель
+   * добавила то, чего не было.
+   *
+   * Замер на фотоподобной картинке 300×220, сжатой в JPEG с качеством 0.6
+   * (резкость — модуль лапласиана, средний и 99-й перцентиль):
+   *
+   *   вариант                       среднее   p99     время
+   *   оригинал                      12.79     56.00   —
+   *   только маскирование           15.07     71.75    68 мс
+   *   круговой рейс с RDN (slim)    10.83     46.63   650 мс  ← ХУЖЕ оригинала
+   *   круговой рейс с GAN           17.26     80.71   952 мс
+   *
+   * RDN обучены минимизировать ошибку и потому сглаживают; при уменьшении
+   * обратно теряется больше, чем было добавлено. GAN синтезирует текстуру,
+   * и она переживает уменьшение.
+   */
+  synthesizesDetail: boolean
 }
 
 const MODELS: Record<ModelChoice, ModelRegistryEntry> = {
@@ -71,6 +93,7 @@ const MODELS: Record<ModelChoice, ModelRegistryEntry> = {
     /** Рецептивное поле: ~10 пикселей у сети из десятка свёрток 3×3. Запас двойной. */
     tileOverlap: 24,
     pixelDivisor: 1,
+    synthesizesDetail: false,
   },
   medium: {
     path: 'models/esrgan-medium-x2/model.json',
@@ -81,6 +104,7 @@ const MODELS: Record<ModelChoice, ModelRegistryEntry> = {
     tileOverlap: 24,
     /** Замер: вдвое дольше slim на мелкой картинке, разрыв растёт с размером. */
     pixelDivisor: 4,
+    synthesizesDetail: false,
   },
   detailed: {
     path: 'models/esrgan-gans-x4/model.json',
@@ -104,6 +128,8 @@ const MODELS: Record<ModelChoice, ModelRegistryEntry> = {
      */
     tileOverlap: 40,
     pixelDivisor: 8,
+    /** Обучена как GAN: синтезирует текстуру, а не сглаживает. */
+    synthesizesDetail: true,
   },
 }
 
@@ -136,6 +162,19 @@ export interface MlRuntime {
   maxInputPixels: number
   run(bitmap: ImageBitmap, sourceUrl: string, sharpen: number): Promise<EnhanceResult>
   destroy(): void
+}
+
+/**
+ * Свойство модели, известное ДО её загрузки.
+ *
+ * Нужно именно так: улучшение качества без изменения размера отказывается
+ * от модели, которая сглаживает, и без этой функции пришлось бы сначала
+ * поднять воркер (800 КБ кода плюс веса), спросить у него свойство и тут же
+ * всё выбросить. Замер разницы: 464 мс против 84 мс на одной и той же
+ * картинке — почти всё это время уходило на загрузку впустую.
+ */
+export function modelSynthesizesDetail(model: ModelChoice): boolean {
+  return MODELS[model].synthesizesDetail
 }
 
 let runtime: Promise<MlRuntime | null> | null = null

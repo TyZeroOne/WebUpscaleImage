@@ -1,5 +1,5 @@
 import { resolvePlan, resolveScale, resolveTargetScale, resolveTargetSize } from '@/core/enhance'
-import type { QualityLevel } from '@/core/enhance'
+import type { EnhanceOperation, QualityLevel } from '@/core/enhance'
 import type { Settings } from '@/core/settings'
 import { getSettings } from '@/core/settings'
 import { t } from '@/core/i18n'
@@ -125,7 +125,22 @@ export function planEnhance(
   image: HTMLImageElement,
   level: QualityLevel,
   settings: Settings,
+  operation: EnhanceOperation = 'upscale',
 ): { scale: number; width: number; height: number; skip: boolean } {
+  /**
+   * Улучшение качества не меняет размер, поэтому ни целевой размер,
+   * ни потолок увеличения к нему не относятся. И пропускать тут нечего:
+   * «картинка уже достаточно большая» — не довод против улучшения качества.
+   */
+  if (operation === 'refine') {
+    return {
+      scale: 1,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      skip: false,
+    }
+  }
+
   const maxScale = resolvePlan(level).maxScale
 
   if (settings.targetMode === 'longest-side') {
@@ -153,6 +168,7 @@ export function planEnhance(
 export async function enhanceImageCore(
   image: HTMLImageElement,
   trigger: EnhanceTrigger,
+  operation: EnhanceOperation,
   signal?: AbortSignal,
 ): Promise<EnhanceOutcome> {
   if (inFlight.has(image)) throw new AlreadyRunningError()
@@ -161,7 +177,7 @@ export async function enhanceImageCore(
   const sourceUrl = image.currentSrc || image.src
   const level = await resolveQualityLevel()
   const settings = await getSettings()
-  const { scale, skip } = planEnhance(image, level, settings)
+  const { scale, skip } = planEnhance(image, level, settings, operation)
 
   /**
    * Отказ до всякой работы: картинка уже подходит под заданный размер.
@@ -203,6 +219,7 @@ export async function enhanceImageCore(
       { level, scale, sharpen: settings.sharpen },
       settings.model,
       settings.mlStrength,
+      operation,
       signal,
     )
 
@@ -248,9 +265,10 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
   return async function enhanceImage(
     image: HTMLImageElement,
     trigger: EnhanceTrigger,
+    operation: EnhanceOperation = 'upscale',
   ): Promise<void> {
     const level = await resolveQualityLevel()
-    const plan = planEnhance(image, level, await getSettings())
+    const plan = planEnhance(image, level, await getSettings(), operation)
 
     // Отказываем сразу, не показывая уведомление о начале работы:
     // мигающее «обрабатываю» перед отказом только сбивает с толку.
@@ -260,16 +278,18 @@ export function createEnhanceFlow({ toaster }: EnhanceFlowDeps) {
     }
 
     const progress = toaster.show(
-      t(
-        'toastProcessing',
-        `${image.naturalWidth}×${image.naturalHeight}`,
-        `${plan.width}×${plan.height}`,
-      ),
+      operation === 'refine'
+        ? t('toastRefining', `${image.naturalWidth}×${image.naturalHeight}`)
+        : t(
+            'toastProcessing',
+            `${image.naturalWidth}×${image.naturalHeight}`,
+            `${plan.width}×${plan.height}`,
+          ),
       { tone: 'progress', durationMs: null },
     )
 
     try {
-      const outcome = await enhanceImageCore(image, trigger)
+      const outcome = await enhanceImageCore(image, trigger, operation)
       const sizeMb = outcome.blob.size / 1024 / 1024
 
       progress.update(

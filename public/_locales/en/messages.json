@@ -5,11 +5,15 @@
   },
 
   "actionTitle": { "message": "ImageEnhancer" },
-  "menuEnhanceImage": { "message": "Enhance this image" },
-  "menuEnhancePage": { "message": "Enhance all images on this page" },
+  "menuEnhanceImage": { "message": "Upscale this image" },
+  "menuRefineImage": { "message": "Improve quality without resizing" },
+  "menuEnhancePage": { "message": "Upscale all images on this page" },
+  "menuRefinePage": { "message": "Improve quality of all images" },
 
-  "overlayEnhance": { "message": "Enhance" },
-  "overlayEnhanceAria": { "message": "Enhance this image" },
+  "overlayEnhance": { "message": "Upscale" },
+  "overlayEnhanceAria": { "message": "Upscale this image" },
+  "overlayRefine": { "message": "Quality" },
+  "overlayRefineAria": { "message": "Improve quality without resizing" },
   "videoBadge": { "message": "Video — coming soon" },
 
   "toastProcessing": {
@@ -18,6 +22,10 @@
       "src": { "content": "$1", "example": "1920×1080" },
       "dst": { "content": "$2", "example": "3840×2160" }
     }
+  },
+  "toastRefining": {
+    "message": "Improving quality: $SIZE$…",
+    "placeholders": { "size": { "content": "$1", "example": "1920×1080" } }
   },
   "toastDone": {
     "message": "Done: $SIZE$, $MB$ MB, $MS$ ms.",
@@ -89,14 +97,15 @@
     }
   },
 
-  "popupEnhancePage": { "message": "Enhance all on this page" },
+  "popupEnhancePage": { "message": "Upscale all on this page" },
+  "popupRefinePage": { "message": "Improve quality of all" },
   "popupSettings": { "message": "Settings" },
   "popupQuality": { "message": "Quality level" },
   "popupImages": { "message": "Images on page" },
   "popupVideos": { "message": "Videos on page" },
   "popupServiceWorker": { "message": "Service worker" },
   "popupNote": {
-    "message": "To enhance a single image, hover over it or use the right-click menu."
+    "message": "\"Upscale\" changes the size, \"Quality\" keeps it. For a single image, hover over it or use the right-click menu."
   },
   "popupChecking": { "message": "checking…" },
   "popupNoAccess": { "message": "no access" },

@@ -1,8 +1,13 @@
 import { createEnhancer, isMlAllowed, resolvePlan } from '@/core/enhance'
-import type { EnhanceOptions, EnhanceResult } from '@/core/enhance'
+import type { EnhanceOperation, EnhanceOptions, EnhanceResult } from '@/core/enhance'
 import { createLogger } from '@/core/log'
 import type { ModelChoice } from '@/core/settings'
-import { type MlRuntime, getMlRuntime, isMlApplicable } from './ml-client'
+import {
+  type MlRuntime,
+  getMlRuntime,
+  isMlApplicable,
+  modelSynthesizesDetail,
+} from './ml-client'
 import { type EnhancePool, createEnhancePool } from './worker-pool'
 
 /**
@@ -214,17 +219,135 @@ async function blendResults(
   }
 }
 
-export async function runEnhance(
+/**
+ * Улучшение качества без изменения размера.
+ *
+ * ПОЧЕМУ ЭТО НЕ «ТО ЖЕ САМОЕ С КОЭФФИЦИЕНТОМ 1»
+ *
+ * При коэффициенте 1 обычный путь не сделал бы ничего осмысленного: модель
+ * увеличивает на фиксированное число по своей архитектуре, а интерполяция
+ * в тот же самый размер — тождественное преобразование.
+ *
+ * Работающий приём — СУПЕРСЭМПЛИНГ: прогнать картинку через модель
+ * с увеличением, а затем вернуть исходный размер уменьшением.
+ *
+ *     оригинал → [модель ×N] → [уменьшение ÷N] → оригинальный размер
+ *
+ * Выигрыш здесь не от размера, а от того, что происходит при уменьшении.
+ * Модель восстанавливает детали на увеличенной сетке; уменьшение усредняет
+ * каждые N×N пикселей в один. Усреднение сохраняет то, в чём модель была
+ * уверена (края, текстура остаются согласованными между соседними пикселями),
+ * и гасит то, в чём она ошиблась: выдуманная микротекстура несогласованна
+ * и при усреднении взаимно уничтожается.
+ *
+ * Побочный и очень полезный эффект: те самые волнистые артефакты, которые
+ * GAN даёт на сжатых фотографиях, при уменьшении подавляются сильнее всего —
+ * они мелкие и хаотичные. То есть здесь тяжёлая модель безопаснее, чем
+ * при обычном увеличении.
+ *
+ * Если модель недоступна, остаётся только нерезкое маскирование. Это честно
+ * меньше, но всё же не ничего.
+ */
+async function runRefine(
   input: { bitmap: ImageBitmap; sourceUrl: string },
   options: EnhanceOptions,
   model: ModelChoice,
   strength: number,
   signal?: AbortSignal,
 ): Promise<EnhanceResult> {
+  const plan = resolvePlan(options.level)
+
+  /**
+   * Первое условие — свойство модели, и проверяется оно ДО её загрузки.
+   *
+   * Круговой рейс через модель, которая сглаживает, ХУЖЕ, чем ничего: замер
+   * дал резкость 46.6 против 56.0 у оригинала и 71.8 у одного лишь
+   * маскирования. Модель, минимизирующая ошибку, не добавляет того, что
+   * переживёт уменьшение. Числа целиком — в комментарии к synthesizesDetail
+   * в ml-client.ts.
+   *
+   * Порядок здесь не косметика: getMlRuntime поднимает воркер и грузит веса,
+   * и спрашивать свойство у него означало бы платить 380 мс за ответ
+   * «модель не подходит», который известен заранее.
+   */
+  const worthTrying = plan.useMl && modelSynthesizesDetail(model) && !signal?.aborted
+  const ml = worthTrying ? await getMlRuntime(model) : null
+
+  /**
+   * Применимость проверяется по КОЭФФИЦИЕНТУ МОДЕЛИ, а не по запрошенному.
+   * Запрошена единица, но модель мы собираемся запускать по-настоящему,
+   * с её собственным увеличением.
+   */
+  const usable =
+    ml !== null &&
+    isMlAllowed(options.level, ml.backend) &&
+    isMlApplicable(ml, input.bitmap.width, input.bitmap.height, ml.scale)
+
+  if (!usable || !ml) {
+    /**
+     * Без подходящей модели остаётся нерезкое маскирование. Это честно
+     * меньше, но измеримо лучше и оригинала, и кругового рейса через
+     * сглаживающую модель.
+     */
+    log.debug('Улучшаю качество только маскированием: подходящей модели нет')
+    return runClassic(input, { ...options, scale: 1 }, signal)
+  }
+
+  const needsBlend = model === 'detailed' && strength < 100
+  const plainSource = needsBlend ? await createImageBitmap(input.bitmap) : null
+
+  try {
+    // Резкость на этом шаге не поднимаем: впереди уменьшение, оно бы её съело.
+    const upscaled = await ml.run(input.bitmap, input.sourceUrl, 0)
+    log.debug(`Суперсэмплинг: ×${ml.scale} моделью, затем возврат к исходному размеру`)
+
+    const upBitmap = await createImageBitmap(upscaled.blob)
+    const refined = await runClassic(
+      { bitmap: upBitmap, sourceUrl: input.sourceUrl },
+      { ...options, scale: 1 / ml.scale },
+      signal,
+    )
+
+    const result: EnhanceResult = {
+      ...refined,
+      backend: upscaled.backend,
+      durationMs: upscaled.durationMs + refined.durationMs,
+    }
+
+    if (!plainSource) return result
+
+    /**
+     * Для смешивания нужен «обычный» вариант того же размера — то есть сам
+     * оригинал, обработанный теми же завершающими шагами. Коэффициент 1,
+     * маскирование то же самое.
+     */
+    const plain = await runClassic(
+      { bitmap: plainSource, sourceUrl: input.sourceUrl },
+      { ...options, scale: 1 },
+      signal,
+    )
+    log.debug(`Смешиваю результат модели с оригиналом: ${strength}%`)
+    return await blendResults(result, plain, strength)
+  } catch (error) {
+    plainSource?.close()
+    throw error
+  }
+}
+
+export async function runEnhance(
+  input: { bitmap: ImageBitmap; sourceUrl: string },
+  options: EnhanceOptions,
+  model: ModelChoice,
+  strength: number,
+  operation: EnhanceOperation,
+  signal?: AbortSignal,
+): Promise<EnhanceResult> {
   if (pool === undefined) {
     pool = createEnhancePool()
     log.info(pool ? `Вычисления в воркерах, размер пула: ${pool.size}` : 'Воркеры недоступны, считаю в потоке страницы')
   }
+
+  if (operation === 'refine') return runRefine(input, options, model, strength, signal)
 
   /**
    * ML пробуется первым, но только когда он уместен.

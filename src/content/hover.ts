@@ -1,4 +1,4 @@
-import type { OverlayButton } from '@/ui/overlay-button'
+import type { OverlayActions } from '@/ui/overlay-actions'
 import type { VideoBadge } from '@/ui/video-badge'
 import { MIN_VIDEO_SIDE_PX, videoBadgeMode } from '@/video'
 import { isEnhanceableImage } from './detect'
@@ -42,7 +42,7 @@ export type MediaTarget =
   | { kind: 'video'; element: HTMLVideoElement }
 
 export interface HoverTrackerOptions {
-  button: OverlayButton
+  actions: OverlayActions
   badge: VideoBadge
   /** Элемент-хозяин shadow root: наведение на него не считается уходом с медиа. */
   host: HTMLElement
@@ -59,14 +59,14 @@ export interface HoverTrackerOptions {
 const HIT_TEST_DEPTH = 5
 
 export function createHoverTracker(options: HoverTrackerOptions): { destroy: () => void } {
-  const { button, badge, host, onChange } = options
+  const { actions, badge, host, onChange } = options
   const badgeMode = videoBadgeMode()
 
   let current: MediaTarget | null = null
   let frame = 0
 
   const hideAll = (): void => {
-    button.hide()
+    actions.hide()
     badge.hide()
   }
 
@@ -74,10 +74,10 @@ export function createHoverTracker(options: HoverTrackerOptions): { destroy: () 
     const rect = target.element.getBoundingClientRect()
     if (target.kind === 'image') {
       badge.hide()
-      button.showFor(rect)
+      actions.showFor(rect)
       return
     }
-    button.hide()
+    actions.hide()
     badge.showFor(rect)
   }
 
@@ -129,7 +129,7 @@ export function createHoverTracker(options: HoverTrackerOptions): { destroy: () 
 
   const handlePointer = (event: MouseEvent): void => {
     const found = mediaAtPoint(event.clientX, event.clientY)
-    // Курсор перешёл на нашу кнопку — текущий элемент не сбрасываем,
+    // Курсор перешёл на наши кнопки — текущий элемент не сбрасываем,
     // иначе кнопка исчезала бы ровно в момент попытки на неё нажать.
     if (found === 'own-ui') return
     setCurrent(found)

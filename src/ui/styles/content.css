@@ -24,10 +24,28 @@
   pointer-events: none;
 }
 
-/* ------------------------------------------------------ кнопка над картинкой */
+/* ----------------------------------------------------- кнопки над картинкой */
 
-.button {
+/*
+ * Две кнопки в одной группе: увеличить и улучшить качество. Группа
+ * позиционируется целиком, поэтому у кнопок нет собственных координат.
+ */
+.actions-group {
   position: fixed;
+  display: inline-flex;
+  gap: 4px;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.actions-group[data-visible='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+.action {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -42,36 +60,28 @@
   font: inherit;
   white-space: nowrap;
   cursor: pointer;
-  pointer-events: auto;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-  opacity: 0;
-  transform: translateY(-2px);
-  transition: opacity 120ms ease, transform 120ms ease, background-color 120ms ease;
+  transition: background-color 120ms ease;
 }
 
-.button[data-visible='true'] {
-  opacity: 1;
-  transform: none;
-}
-
-.button:hover {
+.action:hover {
   background: rgba(79, 125, 243, 0.95);
 }
 
-.button svg {
+.action svg {
   flex: none;
   width: 14px;
   height: 14px;
 }
 
-/* На узких картинках подпись не помещается — остаётся круглая кнопка-иконка. */
-.button[data-compact='true'] {
+/* На узких картинках подписи не помещаются — остаются круглые кнопки-иконки. */
+.actions-group[data-compact='true'] .action {
   padding: 0;
   width: 28px;
   justify-content: center;
 }
 
-.button[data-compact='true'] .label {
+.actions-group[data-compact='true'] .label {
   display: none;
 }
 
@@ -334,7 +344,7 @@
  * здесь раздражает сильнее, чем на обычном сайте.
  */
 @media (prefers-reduced-motion: reduce) {
-  .button,
+  .actions-group,
   .toast,
   .highlight,
   .panel,

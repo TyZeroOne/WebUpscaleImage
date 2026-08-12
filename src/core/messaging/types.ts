@@ -12,6 +12,8 @@
 /** Метка «своё» сообщение. Страница тоже может слать сообщения — их надо отсекать. */
 export const MESSAGE_SOURCE = 'image-enhancer'
 
+import type { EnhanceOperation } from '@/core/enhance/types'
+
 /** Откуда пришёл запрос на улучшение — влияет на то, как показывать результат. */
 export type EnhanceTrigger = 'overlay' | 'context-menu' | 'page'
 
@@ -57,7 +59,7 @@ export interface MessageContracts {
 
   /** Service worker передаёт во вкладку выбор пункта контекстного меню. */
   CONTEXT_MENU_ENHANCE: {
-    request: { srcUrl: string }
+    request: { srcUrl: string; operation: EnhanceOperation }
     response: { handled: boolean }
   }
 
@@ -87,7 +89,7 @@ export interface MessageContracts {
    * завершения было бы некому.
    */
   ENHANCE_PAGE: {
-    request: Record<string, never>
+    request: { operation: EnhanceOperation }
     response: { started: boolean; total: number; reason?: string }
   }
 }

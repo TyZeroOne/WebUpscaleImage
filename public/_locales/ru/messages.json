@@ -5,11 +5,15 @@
   },
 
   "actionTitle": { "message": "ImageEnhancer" },
-  "menuEnhanceImage": { "message": "Улучшить это изображение" },
-  "menuEnhancePage": { "message": "Улучшить все изображения на странице" },
+  "menuEnhanceImage": { "message": "Увеличить это изображение" },
+  "menuRefineImage": { "message": "Улучшить качество без изменения размера" },
+  "menuEnhancePage": { "message": "Увеличить все изображения на странице" },
+  "menuRefinePage": { "message": "Улучшить качество всех изображений" },
 
-  "overlayEnhance": { "message": "Улучшить" },
-  "overlayEnhanceAria": { "message": "Улучшить это изображение" },
+  "overlayEnhance": { "message": "Увеличить" },
+  "overlayEnhanceAria": { "message": "Увеличить это изображение" },
+  "overlayRefine": { "message": "Качество" },
+  "overlayRefineAria": { "message": "Улучшить качество без изменения размера" },
   "videoBadge": { "message": "Видео — скоро" },
 
   "toastProcessing": {
@@ -18,6 +22,10 @@
       "src": { "content": "$1", "example": "1920×1080" },
       "dst": { "content": "$2", "example": "3840×2160" }
     }
+  },
+  "toastRefining": {
+    "message": "Улучшаю качество: $SIZE$…",
+    "placeholders": { "size": { "content": "$1", "example": "1920×1080" } }
   },
   "toastDone": {
     "message": "Готово: $SIZE$, $MB$ МБ, $MS$ мс.",
@@ -89,14 +97,15 @@
     }
   },
 
-  "popupEnhancePage": { "message": "Улучшить все на странице" },
+  "popupEnhancePage": { "message": "Увеличить все на странице" },
+  "popupRefinePage": { "message": "Улучшить качество всех" },
   "popupSettings": { "message": "Настройки" },
   "popupQuality": { "message": "Уровень качества" },
   "popupImages": { "message": "Изображений на странице" },
   "popupVideos": { "message": "Видео на странице" },
   "popupServiceWorker": { "message": "Service worker" },
   "popupNote": {
-    "message": "Отдельную картинку можно улучшить, наведя на неё курсор, или через контекстное меню по правому клику."
+    "message": "«Увеличить» меняет размер, «Качество» — оставляет прежним. Для отдельной картинки наведите на неё курсор или нажмите правой кнопкой."
   },
   "popupChecking": { "message": "проверяю…" },
   "popupNoAccess": { "message": "нет доступа" },

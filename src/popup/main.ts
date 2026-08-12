@@ -1,5 +1,6 @@
 import '@/ui/styles/base.css'
 import { detectCapabilities, recommendLevel } from '@/core/device'
+import type { EnhanceOperation } from '@/core/enhance'
 import { applyI18n, t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import { sendToBackground, sendToTab } from '@/core/messaging'
@@ -72,7 +73,12 @@ async function activeTabId(): Promise<number | undefined> {
 
 async function scanActiveTab(): Promise<void> {
   const tabId = await activeTabId()
-  const enhanceButton = document.getElementById('enhance-page') as HTMLButtonElement | null
+  const buttons = ['enhance-page', 'refine-page'].map(
+    (id) => document.getElementById(id) as HTMLButtonElement | null,
+  )
+  const setDisabled = (value: boolean): void => {
+    for (const button of buttons) if (button) button.disabled = value
+  }
 
   const result = tabId === undefined ? null : await sendToTab(tabId, 'SCAN_PAGE', {})
   if (!result) {
@@ -80,13 +86,13 @@ async function scanActiveTab(): Promise<void> {
     // Chrome Web Store), куда content script не внедряется по правилам Chrome.
     setText('page-images', t('popupNoAccess'))
     setText('page-videos', t('popupNoAccess'))
-    if (enhanceButton) enhanceButton.disabled = true
+    setDisabled(true)
     return
   }
   setText('page-images', String(result.images))
   setText('page-videos', String(result.videos))
-  // Нечего обрабатывать — кнопка не должна выглядеть рабочей.
-  if (enhanceButton) enhanceButton.disabled = result.images === 0
+  // Нечего обрабатывать — кнопки не должны выглядеть рабочими.
+  setDisabled(result.images === 0)
 }
 
 /**
@@ -97,10 +103,10 @@ async function scanActiveTab(): Promise<void> {
  * Прогресс показывает панель на самой странице — она переживёт и закрытие
  * popup, и переключение вкладок.
  */
-async function startPageEnhance(): Promise<void> {
+async function startPageEnhance(operation: EnhanceOperation): Promise<void> {
   const tabId = await activeTabId()
   if (tabId === undefined) return
-  await sendToTab(tabId, 'ENHANCE_PAGE', {})
+  await sendToTab(tabId, 'ENHANCE_PAGE', { operation })
   window.close()
 }
 
@@ -116,5 +122,9 @@ document.getElementById('open-options')?.addEventListener('click', () => {
 })
 
 document.getElementById('enhance-page')?.addEventListener('click', () => {
-  void startPageEnhance().catch((error: unknown) => log.error('Запуск не удался:', error))
+  void startPageEnhance('upscale').catch((error: unknown) => log.error('Запуск не удался:', error))
+})
+
+document.getElementById('refine-page')?.addEventListener('click', () => {
+  void startPageEnhance('refine').catch((error: unknown) => log.error('Запуск не удался:', error))
 })
