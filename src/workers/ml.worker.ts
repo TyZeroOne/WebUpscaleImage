@@ -2,6 +2,7 @@ import * as tf from '@tensorflow/tfjs-core'
 import { type LayersModel, layers as tfLayers, loadLayersModel } from '@tensorflow/tfjs-layers'
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm'
 import '@tensorflow/tfjs-backend-webgpu'
+import { applySharpening } from '@/core/enhance/canvas-enhancer'
 import type {
   MlEnhanceRequest,
   MlInitRequest,
@@ -293,6 +294,13 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
         )
       }
     }
+
+    /**
+     * Маскирование применяется к СОБРАННОМУ холсту, а не к каждой плитке.
+     * По плиткам оно дало бы видимую сетку: у краёв плитки размытие
+     * считалось бы по неполному окружению.
+     */
+    applySharpening(outCanvas, request.sharpen)
 
     const blob = await outCanvas.convertToBlob({ type: 'image/png' })
 

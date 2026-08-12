@@ -157,6 +157,12 @@
     "message": "The detailed model was trained on clean images, so on compressed photos it mistakes compression artefacts for texture and produces wavy smears. Lowering the strength blends in the plain filter and suppresses them. 100% means the network alone."
   },
 
+  "sectionSharpen": { "message": "Sharpness" },
+  "sharpen": { "message": "Unsharp mask" },
+  "sharpenHint": {
+    "message": "Boosts brightness transitions at edges after upscaling. Unlike the neural network it invents nothing — it only emphasises what is already there. All the models deliberately leave sharpening alone. Above 60% on compressed images, light halos start to appear around high-contrast edges."
+  },
+
   "sectionTarget": { "message": "Output size" },
   "targetAuto": { "message": "Automatic" },
   "targetAutoHint": {

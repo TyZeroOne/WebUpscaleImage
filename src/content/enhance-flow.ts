@@ -200,7 +200,7 @@ export async function enhanceImageCore(
     handedOff = true
     const result = await runEnhance(
       { bitmap, sourceUrl },
-      { level, scale },
+      { level, scale, sharpen: settings.sharpen },
       settings.model,
       settings.mlStrength,
       signal,

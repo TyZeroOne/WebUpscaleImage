@@ -134,7 +134,7 @@ export interface MlRuntime {
   /** Во сколько раз увеличивает загруженная модель. */
   scale: number
   maxInputPixels: number
-  run(bitmap: ImageBitmap, sourceUrl: string): Promise<EnhanceResult>
+  run(bitmap: ImageBitmap, sourceUrl: string, sharpen: number): Promise<EnhanceResult>
   destroy(): void
 }
 
@@ -267,7 +267,7 @@ async function createRuntime(model: ModelChoice): Promise<MlRuntime | null> {
       worker.terminate()
     },
 
-    async run(bitmap, _sourceUrl) {
+    async run(bitmap, _sourceUrl, sharpen) {
       const id = nextRequestId
       nextRequestId += 1
 
@@ -277,7 +277,7 @@ async function createRuntime(model: ModelChoice): Promise<MlRuntime | null> {
           (response.type === 'done' || response.type === 'failed') && response.id === id,
       )
 
-      const request: MlEnhanceRequest = { type: 'enhance', id, bitmap }
+      const request: MlEnhanceRequest = { type: 'enhance', id, bitmap, sharpen }
       worker.postMessage(request, [bitmap])
 
       const result = await donePromise

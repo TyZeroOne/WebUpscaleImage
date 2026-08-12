@@ -55,6 +55,13 @@ export interface MlEnhanceRequest {
   id: number
   /** Передаётся как transferable. */
   bitmap: ImageBitmap
+  /**
+   * Сила нерезкого маскирования в процентах, 0 — выключено.
+   *
+   * Делается здесь, а не после получения результата: воркер уже держит
+   * собранный холст, и лишние декодирование с кодированием не нужны.
+   */
+  sharpen: number
 }
 
 export type MlRequest = MlInitRequest | MlEnhanceRequest

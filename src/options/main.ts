@@ -122,22 +122,30 @@ async function init(): Promise<void> {
   syncTargetVisibility(settings.targetMode)
   syncTargetVisibility(settings.model)
 
-  const strength = document.getElementById('ml-strength')
-  const strengthValue = document.getElementById('ml-strength-value')
-  if (strength instanceof HTMLInputElement) {
-    const render = (value: string): void => {
-      if (strengthValue) strengthValue.textContent = `${value}%`
+  /**
+   * Ползунки процентов. Число рядом обновляется на каждое движение,
+   * а сохраняется значение только по отпусканию: иначе запись в хранилище
+   * шла бы десятками за одно перетаскивание, и каждая сбрасывала бы кеш
+   * настроек во всех вкладках.
+   */
+  const sliders: [string, string, keyof Settings][] = [
+    ['ml-strength', 'ml-strength-value', 'mlStrength'],
+    ['sharpen', 'sharpen-value', 'sharpen'],
+  ]
+  for (const [inputId, valueId, key] of sliders) {
+    const input = document.getElementById(inputId)
+    const valueNode = document.getElementById(valueId)
+    if (!(input instanceof HTMLInputElement)) continue
+    const render = (): void => {
+      if (valueNode) valueNode.textContent = `${input.value}%`
     }
-    strength.value = String(settings.mlStrength)
-    render(strength.value)
-    // Число рядом обновляется на каждое движение ползунка, а сохраняется
-    // значение только по отпусканию — иначе запись в хранилище шла бы
-    // десятками за одно перетаскивание.
-    strength.addEventListener('input', () => render(strength.value))
-    strength.addEventListener('change', () => {
-      void patchSettings({ mlStrength: Number(strength.value) })
-        .then(() => flashSaved(saveStateFor(strength)))
-        .catch((error: unknown) => log.error('Не удалось сохранить силу эффекта:', error))
+    input.value = String(settings[key])
+    render()
+    input.addEventListener('input', render)
+    input.addEventListener('change', () => {
+      void patchSettings({ [key]: Number(input.value) })
+        .then(() => flashSaved(saveStateFor(input)))
+        .catch((error: unknown) => log.error('Не удалось сохранить настройку:', error))
     })
   }
 

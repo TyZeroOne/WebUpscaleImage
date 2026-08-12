@@ -6,6 +6,7 @@ import type {
   ImageEnhancer,
 } from './types'
 import { resampleLanczos } from './lanczos'
+import { unsharpMask } from './unsharp'
 
 /**
  * Реализация ImageEnhancer поверх Canvas 2D.
@@ -48,6 +49,24 @@ function assertNotAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new DOMException('Обработка отменена', 'AbortError')
 }
 
+/**
+ * Усиление краёв на готовом холсте.
+ *
+ * Вынесено отдельной функцией, потому что вызывается и здесь, и в ML-воркере:
+ * маскирование одинаково полезно после любого способа увеличения.
+ *
+ * Чтение и запись всего холста стоят заметно, поэтому при нулевой силе
+ * не делается ничего — включая getImageData.
+ */
+export function applySharpening(canvas: OffscreenCanvas, amount: number): void {
+  if (amount <= 0) return
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (!context) return
+  const image = context.getImageData(0, 0, canvas.width, canvas.height)
+  unsharpMask(image, amount)
+  context.putImageData(image, 0, 0)
+}
+
 function context2d(canvas: OffscreenCanvas, willReadFrequently = false): OffscreenCanvasRenderingContext2D {
   const ctx = canvas.getContext('2d', { willReadFrequently })
   if (!ctx) throw new Error('Не удалось получить контекст 2d')
@@ -87,6 +106,10 @@ export class CanvasEnhancer implements ImageEnhancer {
       this.radius === null
         ? this.scaleNative(bitmap, target.width, target.height)
         : this.scaleLanczos(bitmap, target.width, target.height, this.radius, signal)
+
+    assertNotAborted(signal)
+
+    applySharpening(canvas, options.sharpen)
 
     assertNotAborted(signal)
 

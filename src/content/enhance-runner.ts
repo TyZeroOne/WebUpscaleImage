@@ -89,43 +89,68 @@ const SCALE_TOLERANCE = 0.05
  * больше пикселей, чем нужно, и усреднение их даёт результат чище, чем
  * попадание точно в цель.
  */
-async function finishScaling(
-  first: EnhanceResult,
-  sourceUrl: string,
+async function runMlPipeline(
+  input: { bitmap: ImageBitmap; sourceUrl: string },
   options: EnhanceOptions,
   ml: MlRuntime,
   signal?: AbortSignal,
 ): Promise<EnhanceResult> {
-  let current = first
-  let achieved = ml.scale
-  let totalMs = first.durationMs
-
   /**
-   * Дополнительные проходы модели, пока до цели остаётся не меньше её
-   * собственного коэффициента. Ограничение сверху — потолок размера входа:
-   * результат предыдущего прохода уже крупнее исходника во столько же раз.
+   * Число проходов планируется ЗАРАНЕЕ, до первого запуска.
+   *
+   * Иначе не узнать, какой проход последний, а это важно: нерезкое
+   * маскирование должно примениться ровно один раз, к готовому результату.
+   * Применённое на каждом проходе, оно наложилось бы само на себя и дало бы
+   * грубые ореолы вокруг всех краёв.
+   *
+   * Планировать можно точно: размер результата каждого прохода известен
+   * заранее, он равен размеру входа, умноженному на коэффициент модели.
    */
-  while (options.scale / achieved >= ml.scale - SCALE_TOLERANCE) {
-    const bitmap = await createImageBitmap(current.blob)
-    if (bitmap.width * bitmap.height > ml.maxInputPixels) {
-      bitmap.close()
-      log.debug('Ещё один проход модели не помещается в потолок размера')
-      break
-    }
-    log.debug(`Дополнительный проход модели: ${achieved}x -> ${achieved * ml.scale}x`)
-    const next = await ml.run(bitmap, sourceUrl)
-    current = next
+  let passes = 0
+  let achieved = 1
+  let width = input.bitmap.width
+  let height = input.bitmap.height
+  while (
+    options.scale / achieved >= ml.scale - SCALE_TOLERANCE &&
+    width * height <= ml.maxInputPixels
+  ) {
+    passes += 1
     achieved *= ml.scale
-    totalMs += next.durationMs
+    width *= ml.scale
+    height *= ml.scale
   }
+  // Применимость модели уже проверена вызывающей стороной, поэтому хотя бы
+  // один проход делается всегда — даже если он даст больше, чем просили.
+  passes = Math.max(1, passes)
+  achieved = ml.scale ** passes
 
   const remaining = options.scale / achieved
-  if (Math.abs(remaining - 1) <= SCALE_TOLERANCE) {
-    return { ...current, durationMs: totalMs }
+  const needsFinalResize = Math.abs(remaining - 1) > SCALE_TOLERANCE
+
+  let current: EnhanceResult | null = null
+  let bitmap = input.bitmap
+  let totalMs = 0
+
+  for (let pass = 0; pass < passes; pass++) {
+    // Резкость поднимает последний шаг пайплайна. Если после проходов
+    // модели будет ещё изменение размера, поднимать её здесь рано:
+    // масштабирование всё равно сгладит края.
+    const isLastStep = pass === passes - 1 && !needsFinalResize
+    if (pass > 0) log.debug(`Дополнительный проход модели: ${pass}/${passes - 1}`)
+    current = await ml.run(bitmap, input.sourceUrl, isLastStep ? options.sharpen : 0)
+    totalMs += current.durationMs
+    if (pass < passes - 1) bitmap = await createImageBitmap(current.blob)
   }
 
-  const bitmap = await createImageBitmap(current.blob)
-  const finished = await runClassic({ bitmap, sourceUrl }, { ...options, scale: remaining }, signal)
+  const result = current as EnhanceResult
+  if (!needsFinalResize) return { ...result, durationMs: totalMs }
+
+  const finalBitmap = await createImageBitmap(result.blob)
+  const finished = await runClassic(
+    { bitmap: finalBitmap, sourceUrl: input.sourceUrl },
+    { ...options, scale: remaining },
+    signal,
+  )
 
   return {
     ...finished,
@@ -133,7 +158,7 @@ async function finishScaling(
      * Бэкендом считается модель: именно она определила качество результата,
      * а последний проход только привёл размер к запрошенному.
      */
-    backend: current.backend,
+    backend: result.backend,
     durationMs: totalMs + finished.durationMs,
   }
 }
@@ -244,8 +269,7 @@ export async function runEnhance(
       const plainSource = needsBlend ? await createImageBitmap(input.bitmap) : null
 
       try {
-        const enhanced = await ml.run(input.bitmap, input.sourceUrl)
-        const scaled = await finishScaling(enhanced, input.sourceUrl, options, ml, signal)
+        const scaled = await runMlPipeline(input, options, ml, signal)
         if (!plainSource) return scaled
 
         const plain = await runClassic(
