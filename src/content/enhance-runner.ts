@@ -138,10 +138,62 @@ async function finishScaling(
   }
 }
 
+/**
+ * Смешивание результата модели с результатом обычного фильтра.
+ *
+ * ЗАЧЕМ ЭТО НУЖНО
+ *
+ * GAN-модель обучена на чистых уменьшенных копиях фотографий. Реальная
+ * картинка из интернета сжата, и сеть принимает блоки JPEG за текстуру:
+ * достраивает по ним детали, которых нет. Получаются характерные волнистые
+ * «червяки» вдоль краёв и на однородных поверхностях.
+ *
+ * Полностью убрать их можно только другой моделью (обученной на реальных
+ * искажениях), а из доступного — ослабить, смешав с результатом фильтра,
+ * который ничего не выдумывает. Приём стандартный: тем же способом
+ * регулируют силу эффекта в настольных апскейлерах.
+ *
+ * Смешивание идёт через canvas двумя вызовами drawImage, а не попиксельно:
+ * композитинг выполняет браузер, обычно на видеокарте, и стоит миллисекунды
+ * даже на 4К.
+ */
+async function blendResults(
+  enhanced: EnhanceResult,
+  plain: EnhanceResult,
+  strength: number,
+): Promise<EnhanceResult> {
+  const [top, bottom] = await Promise.all([
+    createImageBitmap(enhanced.blob),
+    createImageBitmap(plain.blob),
+  ])
+  try {
+    const canvas = new OffscreenCanvas(enhanced.width, enhanced.height)
+    const context = canvas.getContext('2d')
+    if (!context) return enhanced
+
+    /**
+     * Внизу — результат фильтра, сверху с прозрачностью — результат сети.
+     * Размеры обычно совпадают; если нет, drawImage растянет нижний слой,
+     * что дешевле и безопаснее, чем отказываться от смешивания.
+     */
+    context.drawImage(bottom, 0, 0, enhanced.width, enhanced.height)
+    context.globalAlpha = strength / 100
+    context.drawImage(top, 0, 0, enhanced.width, enhanced.height)
+    context.globalAlpha = 1
+
+    const blob = await canvas.convertToBlob({ type: 'image/png' })
+    return { ...enhanced, blob, durationMs: enhanced.durationMs + plain.durationMs }
+  } finally {
+    top.close()
+    bottom.close()
+  }
+}
+
 export async function runEnhance(
   input: { bitmap: ImageBitmap; sourceUrl: string },
   options: EnhanceOptions,
   model: ModelChoice,
+  strength: number,
   signal?: AbortSignal,
 ): Promise<EnhanceResult> {
   if (pool === undefined) {
@@ -183,10 +235,28 @@ export async function runEnhance(
       isMlAllowed(options.level, ml.backend) &&
       isMlApplicable(ml, input.bitmap.width, input.bitmap.height, options.scale)
     ) {
+      /**
+       * Копия исходника делается ДО передачи в модель: transfer отсоединяет
+       * оригинал, и второго шанса получить пиксели уже не будет.
+       * Копия нужна только когда смешивание действительно предстоит.
+       */
+      const needsBlend = model === 'detailed' && strength < 100
+      const plainSource = needsBlend ? await createImageBitmap(input.bitmap) : null
+
       try {
         const enhanced = await ml.run(input.bitmap, input.sourceUrl)
-        return await finishScaling(enhanced, input.sourceUrl, options, ml, signal)
+        const scaled = await finishScaling(enhanced, input.sourceUrl, options, ml, signal)
+        if (!plainSource) return scaled
+
+        const plain = await runClassic(
+          { bitmap: plainSource, sourceUrl: input.sourceUrl },
+          options,
+          signal,
+        )
+        log.debug(`Смешиваю результат модели с фильтром: ${strength}%`)
+        return await blendResults(scaled, plain, strength)
       } catch (error) {
+        plainSource?.close()
         // Картинка уже передана воркеру — откатиться на классику нельзя.
         log.error('ML-обработка не удалась:', error)
         throw error

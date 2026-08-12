@@ -152,6 +152,11 @@
     "message": "4.5 MB of weights, 477 layers, upscales fourfold in one pass. GAN-trained: it synthesises texture instead of smoothing, so there is far less blur. In exchange it is the slowest, the image size limit is eight times lower, and some fine detail is invented rather than recovered. Not recommended without WebGPU."
   },
 
+  "mlStrength": { "message": "Effect strength" },
+  "mlStrengthHint": {
+    "message": "The detailed model was trained on clean images, so on compressed photos it mistakes compression artefacts for texture and produces wavy smears. Lowering the strength blends in the plain filter and suppresses them. 100% means the network alone."
+  },
+
   "sectionTarget": { "message": "Output size" },
   "targetAuto": { "message": "Automatic" },
   "targetAutoHint": {

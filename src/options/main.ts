@@ -105,14 +105,41 @@ async function init(): Promise<void> {
 
   /**
    * Поле размера и галочка пропуска имеют смысл только при выборе
-   * «привести к размеру». Скрываем их, а не блокируем: неактивное поле
-   * с числом выглядит как что-то, что вот-вот заработает.
+   * «привести к размеру», а сила эффекта — только у GAN-модели. Скрываем,
+   * а не блокируем: неактивное поле выглядит как что-то, что вот-вот
+   * заработает, и заставляет искать способ его включить.
    */
   const targetExtra = document.getElementById('target-extra')
-  function syncTargetVisibility(mode: string): void {
-    if (targetExtra) targetExtra.hidden = mode !== 'longest-side'
+  const strengthRow = document.getElementById('strength-row')
+  function syncTargetVisibility(value: string): void {
+    if (targetExtra && (value === 'auto' || value === 'longest-side')) {
+      targetExtra.hidden = value !== 'longest-side'
+    }
+    if (strengthRow && ['slim', 'medium', 'detailed'].includes(value)) {
+      strengthRow.hidden = value !== 'detailed'
+    }
   }
   syncTargetVisibility(settings.targetMode)
+  syncTargetVisibility(settings.model)
+
+  const strength = document.getElementById('ml-strength')
+  const strengthValue = document.getElementById('ml-strength-value')
+  if (strength instanceof HTMLInputElement) {
+    const render = (value: string): void => {
+      if (strengthValue) strengthValue.textContent = `${value}%`
+    }
+    strength.value = String(settings.mlStrength)
+    render(strength.value)
+    // Число рядом обновляется на каждое движение ползунка, а сохраняется
+    // значение только по отпусканию — иначе запись в хранилище шла бы
+    // десятками за одно перетаскивание.
+    strength.addEventListener('input', () => render(strength.value))
+    strength.addEventListener('change', () => {
+      void patchSettings({ mlStrength: Number(strength.value) })
+        .then(() => flashSaved(saveStateFor(strength)))
+        .catch((error: unknown) => log.error('Не удалось сохранить силу эффекта:', error))
+    })
+  }
 
   const targetPx = document.getElementById('target-px')
   if (targetPx instanceof HTMLInputElement) {

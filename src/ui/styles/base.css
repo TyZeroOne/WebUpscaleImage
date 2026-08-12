@@ -229,3 +229,13 @@ input[type='number']:focus {
 ul.ie-rows[hidden] {
   display: none;
 }
+
+input[type='range'] {
+  width: 130px;
+  accent-color: var(--ie-accent);
+}
+
+#ml-strength-value {
+  min-width: 38px;
+  font-variant-numeric: tabular-nums;
+}

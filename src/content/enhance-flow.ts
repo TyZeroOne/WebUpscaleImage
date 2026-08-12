@@ -198,7 +198,13 @@ export async function enhanceImageCore(
     // С этого момента картинкой владеет runEnhance: она либо уедет в воркер
     // вместе с владением, либо будет освобождена там же после вычислений.
     handedOff = true
-    const result = await runEnhance({ bitmap, sourceUrl }, { level, scale }, settings.model, signal)
+    const result = await runEnhance(
+      { bitmap, sourceUrl },
+      { level, scale },
+      settings.model,
+      settings.mlStrength,
+      signal,
+    )
 
     log.info(
       `Готово за ${result.durationMs} мс (${result.backend}, ` +
