@@ -47,11 +47,15 @@ const WASM_PATH = 'wasm/'
  */
 interface ModelRegistryEntry {
   path: string
+  /** Формат сохранения — от него зависит функция загрузки. См. MlModelSpec. */
+  format: 'layers' | 'graph'
   scale: number
   inputMax: number
   customLayers: boolean
   tileSize: number
   tileOverlap: number
+  /** Требует ли модель плитку строго размера tileSize + 2 × tileOverlap. */
+  fixedInputSize: boolean
   /**
    * Стоимость одного прохода модели: микросекунды на пиксель ВХОДА, WebGPU.
    *
@@ -105,6 +109,7 @@ interface ModelRegistryEntry {
 const MODELS: Record<ModelChoice, ModelRegistryEntry> = {
   slim: {
     path: 'models/esrgan-slim-x2/model.json',
+    format: 'layers',
     scale: 2,
     inputMax: 255,
     customLayers: false,
@@ -117,20 +122,24 @@ const MODELS: Record<ModelChoice, ModelRegistryEntry> = {
     /** Рецептивное поле: ~10 пикселей у сети из десятка свёрток 3×3. Запас двойной. */
     tileOverlap: 24,
     usPerPixel: 0.9,
+    fixedInputSize: false,
     synthesizesDetail: false,
   },
   medium: {
     path: 'models/esrgan-medium-x2/model.json',
+    format: 'layers',
     scale: 2,
     inputMax: 255,
     customLayers: false,
     tileSize: 224,
     tileOverlap: 24,
     usPerPixel: 1.2,
+    fixedInputSize: false,
     synthesizesDetail: false,
   },
   detailed: {
     path: 'models/esrgan-gans-x4/model.json',
+    format: 'layers',
     scale: 4,
     /** RRDN обучена на диапазоне 0..1, в отличие от RDN-вариантов. */
     inputMax: 1,
@@ -151,7 +160,34 @@ const MODELS: Record<ModelChoice, ModelRegistryEntry> = {
      */
     tileOverlap: 40,
     usPerPixel: 5.3,
+    fixedInputSize: false,
     /** Обучена как GAN: синтезирует текстуру, а не сглаживает. */
+    synthesizesDetail: true,
+  },
+  real: {
+    path: 'models/realesrgan-general-x4/model.json',
+    /** Экспортирована как граф операций, а не как набор слоёв. */
+    format: 'graph',
+    scale: 4,
+    inputMax: 1,
+    /** У graph-модели слоёв нет вообще — регистрировать нечего. */
+    customLayers: false,
+    /**
+     * 48 и 8 выбраны не по рецептивному полю, а по арифметике: модель
+     * экспортирована с жёстко зафиксированным входом 64×64, и сумма
+     * 48 + 2 × 8 обязана дать ровно 64. Свободы здесь ровно одна —
+     * как поделить 64 между сердцевиной и полями.
+     *
+     * Поля в 8 пикселей проверены замером швов на гладком градиенте:
+     * границы плиток не обнаруживаются. Шире поля — меньше полезной
+     * площади: при 48 из 64 на дело идёт 56% каждого прогона, при 40 из 64
+     * было бы уже 39%, то есть почти в полтора раза больше работы.
+     */
+    tileSize: 48,
+    tileOverlap: 8,
+    /** Замер: 5.5 мс на плитку 64×64, то есть 1.3 мкс на пиксель входа. */
+    usPerPixel: 1.3,
+    fixedInputSize: true,
     synthesizesDetail: true,
   },
 }
@@ -316,11 +352,13 @@ async function createRuntime(model: ModelChoice): Promise<MlRuntime | null> {
     type: 'init',
     model: {
       url: absoluteUrl(entry.path),
+      format: entry.format,
       scale: entry.scale,
       inputMax: entry.inputMax,
       customLayers: entry.customLayers,
       tileSize: entry.tileSize,
       tileOverlap: entry.tileOverlap,
+      fixedInputSize: entry.fixedInputSize,
     },
     wasmBaseUrl: absoluteUrl(WASM_PATH),
     // Решение о бэкенде принимает воркер: он один может достоверно

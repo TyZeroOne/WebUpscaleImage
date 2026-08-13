@@ -35,6 +35,18 @@ const MODELS = [
   { pkg: 'esrgan-legacy', variant: 'gans', out: 'esrgan-gans-x4' },
 ]
 
+/**
+ * Модели, лежащие в самом репозитории, а не в node_modules.
+ *
+ * Причина подробно расписана в vendor/models/README.md: их пакет тянет
+ * за собой @tensorflow/tfjs-node и нативный canvas — около 150 МБ и сборка
+ * на машине разработчика ради 4.9 МБ весов.
+ *
+ * Лицензия у них ДРУГАЯ, не как у остального проекта (GPL на конвертацию).
+ * Это записано и в vendor/models/README.md, и на странице настроек.
+ */
+const VENDORED_MODELS = ['realesrgan-general-x4']
+
 const modelsTarget = new URL('public/models/', root)
 const wasmSource = new URL('node_modules/@tensorflow/tfjs-backend-wasm/dist/', root)
 const wasmTarget = new URL('public/wasm/', root)
@@ -53,6 +65,12 @@ for (const model of MODELS) {
   await cp(source, target, { recursive: true })
 }
 
+for (const name of VENDORED_MODELS) {
+  await cp(new URL(`vendor/models/${name}/`, root), new URL(`${name}/`, modelsTarget), {
+    recursive: true,
+  })
+}
+
 /**
  * Бинарников три: базовый, с SIMD и с SIMD+потоками. Бэкенд сам выбирает
  * нужный в рантайме по возможностям браузера, поэтому нужны все.
@@ -62,6 +80,5 @@ for (const name of wasmFiles) {
   await cp(new URL(name, wasmSource), new URL(name, wasmTarget))
 }
 
-console.log(
-  `[assets] модели ${MODELS.map((m) => m.out).join(', ')} и ${wasmFiles.length} .wasm скопированы в public/`,
-)
+const all = [...MODELS.map((m) => m.out), ...VENDORED_MODELS]
+console.log(`[assets] модели ${all.join(', ')} и ${wasmFiles.length} .wasm скопированы в public/`)

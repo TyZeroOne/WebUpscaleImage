@@ -21,7 +21,10 @@
 - **Обработка изображений:**
   - базовый уровень — Canvas 2D API, фильтр Ланцоша собственной реализации
   - продвинутый уровень — TensorFlow.js 4.22, WebGPU с фоллбеком на WASM SIMD,
-    модель ESRGAN-slim x2 (`@upscalerjs/esrgan-slim`, MIT, RDN-архитектура)
+    четыре модели на выбор: три ESRGAN из `@upscalerjs/*` (MIT) и Real-ESRGAN
+    general ×4 (веса в `vendor/models/`, конвертация под **GPL** — см. раздел
+    «Лицензии» на странице настроек). По умолчанию — Real-ESRGAN: она
+    единственная обучена на смоделированных настоящих искажениях
   - *выбор рантайма:* взят TensorFlow.js, а не ONNX Runtime Web — готовой SR-модели
     в формате ONNX в npm не нашлось, а к TF.js есть обученная модель, ставящаяся
     обычным `npm install`
@@ -80,6 +83,9 @@ image-enhancer/
     options/            — логика страницы настроек
     popup/              — логика окна по клику на иконку
   models/               — веса ML-моделей (с этапа 5)
+vendor/models/          — веса, которые нельзя взять из npm: их пакет тянет
+                          150 МБ зависимостей ради 2.4 МБ данных. Лицензия
+                          у них своя, отличная от лицензии проекта
   docs/                 — эта документация
 ```
 
@@ -151,8 +157,9 @@ image-enhancer/
 
 | 10 | Выбор модели и целевого размера | [11_Stage10_ModelAndTarget_Impl.md](11_Stage10_ModelAndTarget_Impl.md) | [11_Stage10_ModelAndTarget_Guide.md](11_Stage10_ModelAndTarget_Guide.md) | ✅ готов |
 | 11 | Улучшение качества без изменения размера | [12_Stage11_Refine_Impl.md](12_Stage11_Refine_Impl.md) | [12_Stage11_Refine_Guide.md](12_Stage11_Refine_Guide.md) | ✅ готов |
+| 12 | Модель, обученная на настоящих искажениях | [13_Stage12_RealModel_Impl.md](13_Stage12_RealModel_Impl.md) | [13_Stage12_RealModel_Guide.md](13_Stage12_RealModel_Guide.md) | ✅ готов |
 
-Этапы 0–9 — исходный план. Этапы 10 и 11 добавлены по запросу после того, как
+Этапы 0–9 — исходный план. Этапы 10–12 добавлены по запросу после того, как
 расширение попробовали в работе. Отдельно: [PRIVACY.md](PRIVACY.md) — политика
 конфиденциальности для публикации.
 

@@ -1,4 +1,5 @@
 import * as tf from '@tensorflow/tfjs-core'
+import { type GraphModel, loadGraphModel } from '@tensorflow/tfjs-converter'
 import { type LayersModel, layers as tfLayers, loadLayersModel } from '@tensorflow/tfjs-layers'
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm'
 import '@tensorflow/tfjs-backend-webgpu'
@@ -106,7 +107,14 @@ function registerCustomLayers(scale: number): void {
   registeredLayers.add(key)
 }
 
-let model: LayersModel | null = null
+/**
+ * Две разные реализации, у которых совпадает ровно то, что нам нужно:
+ * метод predict и свойство inputs. Общего базового типа у них нет,
+ * поэтому объединение.
+ */
+type AnyModel = LayersModel | GraphModel
+
+let model: AnyModel | null = null
 let spec: MlModelSpec | null = null
 let activeBackend = ''
 
@@ -143,8 +151,12 @@ async function selectBackend(request: MlInitRequest): Promise<string> {
   return tf.getBackend()
 }
 
-async function warmUp(loaded: LayersModel): Promise<void> {
-  const probe = tf.zeros([1, WARMUP_SIZE, WARMUP_SIZE, 3])
+/**
+ * @param size сторона прогревочного квадрата. У моделей с зафиксированной
+ *             формой входа он обязан совпадать с ней — иначе прогрев упадёт.
+ */
+async function warmUp(loaded: AnyModel, size: number): Promise<void> {
+  const probe = tf.zeros([1, size, size, 3])
   const output = loaded.predict(probe) as tf.Tensor
   // dataSync дожидается фактического выполнения: без него на GPU-бэкенде
   // работа осталась бы в очереди, и прогрев ничего бы не прогрел.
@@ -153,14 +165,48 @@ async function warmUp(loaded: LayersModel): Promise<void> {
   output.dispose()
 }
 
+/** Полная сторона плитки, которая уходит в модель: сердцевина плюс поля с двух сторон. */
+function windowSize(current: MlModelSpec): number {
+  return current.tileSize + 2 * current.tileOverlap
+}
+
+/**
+ * Сверка формы входа с тем, что записано в реестре моделей.
+ *
+ * Проверка дешёвая, а ошибка без неё дорогая: несовпадение проявилось бы
+ * отказом на первой же плитке, то есть уже после загрузки весов и прогрева,
+ * и в сообщении «shape must be [1,64,64,3]» не было бы ни слова о том,
+ * что чинить надо реестр.
+ */
+function assertInputShape(loaded: AnyModel, current: MlModelSpec): void {
+  if (!current.fixedInputSize) return
+  const shape = loaded.inputs[0]?.shape
+  const expected = windowSize(current)
+  const actual = shape?.[1]
+  if (typeof actual === 'number' && actual !== expected) {
+    throw new Error(
+      `Модель ждёт вход ${actual}×${actual}, а плитка собрана ${expected}×${expected}. ` +
+        'Поправьте tileSize и tileOverlap в реестре моделей: их сумма с полями ' +
+        'обязана давать ровно размер входа модели.',
+    )
+  }
+}
+
 async function init(request: MlInitRequest): Promise<MlResponse> {
   const startedAt = performance.now()
   try {
     spec = request.model
     if (spec.customLayers) registerCustomLayers(spec.scale)
     activeBackend = await selectBackend(request)
-    model = await loadLayersModel(spec.url)
-    await warmUp(model)
+    /**
+     * Загрузчик свой у каждого формата. loadLayersModel на graph-модели
+     * падает с невнятным «Cannot read properties of undefined»: он ищет
+     * в model.json описание слоёв, которого там нет.
+     */
+    model =
+      spec.format === 'graph' ? await loadGraphModel(spec.url) : await loadLayersModel(spec.url)
+    assertInputShape(model, spec)
+    await warmUp(model, spec.fixedInputSize ? windowSize(spec) : WARMUP_SIZE)
     return {
       type: 'ready',
       backend: activeBackend,
@@ -219,6 +265,52 @@ async function inferTile(tile: ImageData): Promise<Uint8ClampedArray> {
 }
 
 /**
+ * Сбор плитки постоянного размера с дополнением краёв.
+ *
+ * Окно [wx, wy, size × size] может выходить за границы картинки — у краевых
+ * плиток это норма. Существующая часть рисуется на своё место, а недостающие
+ * поля заполняются растягиванием крайнего ряда пикселей наружу.
+ *
+ * Почему именно растягивание, а не нули и не зеркало:
+ *   нули — сеть увидела бы у края чёрную рамку и достроила по ней контраст,
+ *          которого нет; это видно как тёмная кайма по периметру картинки;
+ *   зеркало — правильнее по спектру, но требует попиксельного копирования,
+ *          а тут сотни плиток на картинку;
+ *   растягивание — четыре вызова drawImage, и край получается ровно таким,
+ *          каким сеть его и так считает продолжением.
+ *
+ * Порядок вызовов не случаен: сначала верх и низ на ширину сердцевины,
+ * потом лево и право на всю высоту — так углы заполняются сами,
+ * без отдельного случая для каждого из четырёх.
+ */
+function padWindow(
+  ctx: OffscreenCanvasRenderingContext2D,
+  source: OffscreenCanvas,
+  wx: number,
+  wy: number,
+  size: number,
+  imageWidth: number,
+  imageHeight: number,
+): void {
+  const sx = Math.max(0, wx)
+  const sy = Math.max(0, wy)
+  const sw = Math.min(imageWidth, wx + size) - sx
+  const sh = Math.min(imageHeight, wy + size) - sy
+  const dx = sx - wx
+  const dy = sy - wy
+
+  ctx.clearRect(0, 0, size, size)
+  ctx.drawImage(source, sx, sy, sw, sh, dx, dy, sw, sh)
+
+  if (dy > 0) ctx.drawImage(ctx.canvas, dx, dy, sw, 1, dx, 0, sw, dy)
+  const below = size - (dy + sh)
+  if (below > 0) ctx.drawImage(ctx.canvas, dx, dy + sh - 1, sw, 1, dx, dy + sh, sw, below)
+  if (dx > 0) ctx.drawImage(ctx.canvas, dx, 0, 1, size, 0, 0, dx, size)
+  const right = size - (dx + sw)
+  if (right > 0) ctx.drawImage(ctx.canvas, dx + sw - 1, 0, 1, size, dx + sw, 0, right, size)
+}
+
+/**
  * Обработка плитками.
  *
  * Целиком картинку в модель отправлять нельзя. Замеры показали жёсткий
@@ -236,7 +328,8 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
 
   const startedAt = performance.now()
   const source = request.bitmap
-  const { scale, tileSize: TILE_SIZE, tileOverlap: TILE_OVERLAP } = spec
+  const { scale, tileSize: TILE_SIZE, tileOverlap: TILE_OVERLAP, fixedInputSize } = spec
+  const WINDOW = windowSize(spec)
   try {
     const width = source.width
     const height = source.height
@@ -250,30 +343,67 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
     const outContext = outCanvas.getContext('2d')
     if (!outContext) throw new Error('Не удалось получить контекст 2d')
 
+    /**
+     * Холст под плитку постоянного размера. Нужен только моделям
+     * с зафиксированной формой входа, поэтому создаётся по требованию
+     * и переиспользуется всеми плитками: их бывают сотни.
+     */
+    const padCanvas = fixedInputSize ? new OffscreenCanvas(WINDOW, WINDOW) : null
+    const padContext = padCanvas?.getContext('2d', { willReadFrequently: true }) ?? null
+    if (padCanvas && !padContext) throw new Error('Не удалось получить контекст 2d')
+
     for (let y = 0; y < height; y += TILE_SIZE) {
       for (let x = 0; x < width; x += TILE_SIZE) {
         const tileWidth = Math.min(TILE_SIZE, width - x)
         const tileHeight = Math.min(TILE_SIZE, height - y)
 
-        // Поля добавляются со всех сторон и обрезаются по краям картинки.
-        const padLeft = Math.min(TILE_OVERLAP, x)
-        const padTop = Math.min(TILE_OVERLAP, y)
-        const padRight = Math.min(TILE_OVERLAP, width - (x + tileWidth))
-        const padBottom = Math.min(TILE_OVERLAP, height - (y + tileHeight))
+        let tile: ImageData
+        let windowX: number
+        let windowY: number
+        let windowW: number
+        let windowH: number
+        let offsetX: number
+        let offsetY: number
 
-        const paddedWidth = tileWidth + padLeft + padRight
-        const paddedHeight = tileHeight + padTop + padBottom
+        if (padContext) {
+          /**
+           * Окно всегда одного размера и всегда с полями со всех сторон,
+           * даже у самого края картинки, где полей взять неоткуда.
+           * Недостающее дополняется растягиванием краевых пикселей —
+           * это не «правильное» продолжение картинки, но лучшее из дешёвых:
+           * нулевые поля дали бы сети чёрную рамку, и она достроила бы
+           * по ней несуществующий контраст.
+           */
+          windowX = x - TILE_OVERLAP
+          windowY = y - TILE_OVERLAP
+          windowW = WINDOW
+          windowH = WINDOW
+          offsetX = TILE_OVERLAP
+          offsetY = TILE_OVERLAP
+          padWindow(padContext, sourceCanvas, windowX, windowY, WINDOW, width, height)
+          tile = padContext.getImageData(0, 0, WINDOW, WINDOW)
+        } else {
+          // Свободная форма входа: проще обрезать поля по краям картинки,
+          // чем что-то дорисовывать.
+          const padLeft = Math.min(TILE_OVERLAP, x)
+          const padTop = Math.min(TILE_OVERLAP, y)
+          const padRight = Math.min(TILE_OVERLAP, width - (x + tileWidth))
+          const padBottom = Math.min(TILE_OVERLAP, height - (y + tileHeight))
+          windowX = x - padLeft
+          windowY = y - padTop
+          windowW = tileWidth + padLeft + padRight
+          windowH = tileHeight + padTop + padBottom
+          offsetX = padLeft
+          offsetY = padTop
+          tile = sourceContext.getImageData(windowX, windowY, windowW, windowH)
+        }
 
-        const tile = sourceContext.getImageData(x - padLeft, y - padTop, paddedWidth, paddedHeight)
         const resultPixels = await inferTile(tile)
 
         // createImageData + set вместо конструктора ImageData: конструктор
         // требует буфер строго типа ArrayBuffer, а toPixels возвращает массив
         // поверх ArrayBufferLike, и типы не сходятся.
-        const resultData = outContext.createImageData(
-          paddedWidth * scale,
-          paddedHeight * scale,
-        )
+        const resultData = outContext.createImageData(windowW * scale, windowH * scale)
         resultData.data.set(resultPixels)
 
         /**
@@ -282,13 +412,17 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
          * для этого — свёртки у края плитки видят «обрыв» изображения
          * и дают там искажения, которые на стыке плиток сложились бы
          * в видимую сетку.
+         *
+         * Начало кладётся по окну, а вырезка отсчитывается от него же,
+         * поэтому отрицательное windowX у краевой плитки не мешает:
+         * итоговое место всё равно выходит x * scale.
          */
         outContext.putImageData(
           resultData,
-          (x - padLeft) * scale,
-          (y - padTop) * scale,
-          padLeft * scale,
-          padTop * scale,
+          windowX * scale,
+          windowY * scale,
+          offsetX * scale,
+          offsetY * scale,
           tileWidth * scale,
           tileHeight * scale,
         )

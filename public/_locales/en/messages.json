@@ -56,10 +56,10 @@
 
   "errAlreadyBigEnough": { "message": "This image is already the target size — nothing to do." },
   "errRefineNoOp": {
-    "message": "Nothing to improve with: sharpening is off and the selected network adds no detail. Raise the sharpness or pick the detailed model in settings."
+    "message": "Nothing to improve with: sharpening is off and the selected network adds no detail. Raise the sharpness, or pick Real-ESRGAN or the detailed model in settings."
   },
   "errRefineTooLarge": {
-    "message": "This image is too large for the detailed model on this device, and sharpening is off. Raise the sharpness in settings — it works at any size."
+    "message": "This image is too large for the selected model on this device, and sharpening is off. Raise the sharpness in settings — it works at any size."
   },
 
   "pageBusy": { "message": "This page is already being processed." },
@@ -154,17 +154,21 @@
   },
 
   "sectionModel": { "message": "Neural network" },
+  "modelReal": { "message": "Real-ESRGAN (×4) — recommended" },
+  "modelRealHint": {
+    "message": "2.4 MB of weights, upscales fourfold in one pass. It differs from the others not in architecture but in training: the others only ever saw clean downscaled copies, while this one saw simulated real-world degradation — compression, noise and blur. Measured on the reference test: the most accurate of them all (error 5.7 against 6.3 for the detailed model) and four times cheaper in time. In exchange it adds less texture than the detailed model."
+  },
   "modelSlim": { "message": "Light (ESRGAN-slim)" },
   "modelSlimHint": {
     "message": "0.9 MB of weights. Fast: about 0.1 s for a 600×400 image on WebGPU. Moderate improvement."
   },
   "modelMedium": { "message": "Medium (ESRGAN-medium)" },
   "modelMediumHint": {
-    "message": "2.7 MB of weights, roughly three times deeper. Slightly more detail, twice as slow; the image size limit is four times lower."
+    "message": "2.7 MB of weights, roughly three times deeper. Measurements show little difference from the light model: both run into the same training objective."
   },
   "modelDetailed": { "message": "Detailed (ESRGAN GAN, ×4)" },
   "modelDetailedHint": {
-    "message": "4.5 MB of weights, 477 layers, upscales fourfold in one pass. GAN-trained: it synthesises texture instead of smoothing, so there is far less blur. In exchange it is the slowest, the image size limit is eight times lower, and some fine detail is invented rather than recovered. Not recommended without WebGPU."
+    "message": "4.5 MB of weights, 477 layers, upscales fourfold in one pass. GAN-trained: it synthesises texture instead of smoothing, so there is far less blur. In exchange it is the slowest of them all (four times dearer than Real-ESRGAN), its image size limit is correspondingly lower, and some fine detail is invented rather than recovered. Not recommended without WebGPU."
   },
 
   "mlStrength": { "message": "Effect strength" },
@@ -215,5 +219,10 @@
 
   "privacyText": {
     "message": "All processing happens on this device. Images are never uploaded, and the extension collects no analytics. Access to all sites is needed for exactly one thing: downloading an image you explicitly picked, when the page blocks access to it."
+  },
+
+  "sectionLicenses": { "message": "Licences" },
+  "licensesText": {
+    "message": "The ESRGAN-slim, ESRGAN-medium and ESRGAN GAN models are MIT-licensed, from the UpscalerJS project. Real-ESRGAN is BSD 3-Clause. Its weights, as converted to the TensorFlow.js format, are distributed under the GPL (conversion by xororz, the web-realesrgan project), and that licence applies to the extension as a whole."
   }
 }
