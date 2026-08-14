@@ -3,6 +3,7 @@ import { type GraphModel, loadGraphModel } from '@tensorflow/tfjs-converter'
 import { type LayersModel, layers as tfLayers, loadLayersModel } from '@tensorflow/tfjs-layers'
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm'
 import '@tensorflow/tfjs-backend-webgpu'
+import { applyAlphaPlane, extractAlphaPlane } from '@/core/enhance/alpha'
 import { applySharpening } from '@/core/enhance/canvas-enhancer'
 import type {
   MlEnhanceRequest,
@@ -339,6 +340,17 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
     if (!sourceContext) throw new Error('Не удалось получить контекст 2d')
     sourceContext.drawImage(source, 0, 0)
 
+    /**
+     * Альфа снимается ДО модели и возвращается ПОСЛЕ.
+     *
+     * Модель принимает три канала; четвёртый она не увидит, а на выходе
+     * поставит 255. Без этой пары строк прозрачный логотип возвращался бы
+     * непрозрачным — см. src/core/enhance/alpha.ts.
+     */
+    const alphaPlane = extractAlphaPlane(
+      sourceContext.getImageData(0, 0, width, height),
+    )
+
     const outCanvas = new OffscreenCanvas(width * scale, height * scale)
     const outContext = outCanvas.getContext('2d')
     if (!outContext) throw new Error('Не удалось получить контекст 2d')
@@ -435,6 +447,10 @@ async function enhance(request: MlEnhanceRequest): Promise<MlResponse> {
      * считалось бы по неполному окружению.
      */
     applySharpening(outCanvas, request.sharpen)
+
+    // Последним шагом: маскирование альфу не трогает, но холст перечитывает,
+    // и вклиниваться между ними незачем.
+    if (alphaPlane) applyAlphaPlane(outCanvas, alphaPlane)
 
     const blob = await outCanvas.convertToBlob({ type: 'image/png' })
 

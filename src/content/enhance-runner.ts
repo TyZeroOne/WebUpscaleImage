@@ -208,7 +208,19 @@ async function blendResults(
      */
     context.drawImage(bottom, 0, 0, enhanced.width, enhanced.height)
     context.globalAlpha = strength / 100
+    /**
+     * source-atop, а не обычное наложение: этот режим оставляет альфу
+     * нижнего слоя нетронутой и подмешивает верхний только туда, где низ
+     * непрозрачен.
+     *
+     * Без него у полупрозрачных пикселей альфа росла бы: обычное наложение
+     * складывает прозрачности, и при альфе 0.5 в обоих слоях и силе 70%
+     * получилось бы 0.68 вместо 0.5 — картинка становилась бы плотнее там,
+     * где должна просвечивать.
+     */
+    context.globalCompositeOperation = 'source-atop'
     context.drawImage(top, 0, 0, enhanced.width, enhanced.height)
+    context.globalCompositeOperation = 'source-over'
     context.globalAlpha = 1
 
     const blob = await canvas.convertToBlob({ type: 'image/png' })
