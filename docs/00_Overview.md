@@ -4,8 +4,9 @@
 апскейл, шумоподавление, резкость. Все вычисления — **локально, на машине пользователя**.
 Картинки никуда не отправляются.
 
-Два действия, и они устроены по-разному: **«Увеличить»** меняет размер (этапы 2–5, 10),
-**«Качество»** оставляет его прежним и улучшает картинку суперсэмплингом (этап 11).
+Три действия над выбранной картинкой: **«Увеличить»** меняет размер (этапы 2–5, 10),
+**«Качество»** оставляет его прежним и улучшает картинку суперсэмплингом (этап 11),
+**«Размер»** приводит к заданному разрешению в любую сторону (этап 13).
 
 Разработка идёт этапами. Каждый этап закрывается двумя документами в этой папке (`docs/`):
 кратким `..._Impl.md` для того, кто хочет быстро понять «что тут сделано», и подробным
@@ -147,7 +148,7 @@ vendor/models/          — веса, которые нельзя взять и�
 | 0 | Настройка проекта | [01_Stage0_ProjectSetup_Impl.md](01_Stage0_ProjectSetup_Impl.md) | [01_Stage0_ProjectSetup_Guide.md](01_Stage0_ProjectSetup_Guide.md) | ✅ готов |
 | 1 | Детекция и UI-точки входа | [02_Stage1_ImageDetection_Impl.md](02_Stage1_ImageDetection_Impl.md) | [02_Stage1_ImageDetection_Guide.md](02_Stage1_ImageDetection_Guide.md) | ✅ готов |
 | 2 | Классический апскейл, режим «одно изображение» | [03_Stage2_ClassicUpscale_Impl.md](03_Stage2_ClassicUpscale_Impl.md) | [03_Stage2_ClassicUpscale_Guide.md](03_Stage2_ClassicUpscale_Guide.md) | ✅ готов |
-| 3 | Режим «вся страница» | [04_Stage3_PageMode_Impl.md](04_Stage3_PageMode_Impl.md) | [04_Stage3_PageMode_Guide.md](04_Stage3_PageMode_Guide.md) | ✅ готов |
+| 3 | ~~Режим «вся страница»~~ | [04_Stage3_PageMode_Impl.md](04_Stage3_PageMode_Impl.md) | [04_Stage3_PageMode_Guide.md](04_Stage3_PageMode_Guide.md) | ❌ **удалён на этапе 13** |
 | 4 | Вынос вычислений в Web Worker | [05_Stage4_Worker_Impl.md](05_Stage4_Worker_Impl.md) | [05_Stage4_Worker_Guide.md](05_Stage4_Worker_Guide.md) | ✅ готов |
 | 5 | ML-апскейл | [06_Stage5_MlUpscale_Impl.md](06_Stage5_MlUpscale_Impl.md) | [06_Stage5_MlUpscale_Guide.md](06_Stage5_MlUpscale_Guide.md) | ✅ готов |
 | 6 | Уровни качества и настройки | [07_Stage6_Settings_Impl.md](07_Stage6_Settings_Impl.md) | [07_Stage6_Settings_Guide.md](07_Stage6_Settings_Guide.md) | ✅ готов |
@@ -158,9 +159,16 @@ vendor/models/          — веса, которые нельзя взять и�
 | 10 | Выбор модели и целевого размера | [11_Stage10_ModelAndTarget_Impl.md](11_Stage10_ModelAndTarget_Impl.md) | [11_Stage10_ModelAndTarget_Guide.md](11_Stage10_ModelAndTarget_Guide.md) | ✅ готов |
 | 11 | Улучшение качества без изменения размера | [12_Stage11_Refine_Impl.md](12_Stage11_Refine_Impl.md) | [12_Stage11_Refine_Guide.md](12_Stage11_Refine_Guide.md) | ✅ готов |
 | 12 | Модель, обученная на настоящих искажениях | [13_Stage12_RealModel_Impl.md](13_Stage12_RealModel_Impl.md) | [13_Stage12_RealModel_Guide.md](13_Stage12_RealModel_Guide.md) | ✅ готов |
+| 13 | Прозрачность, сокращение области, выбор разрешения | [14_Stage13_SizeAndScope_Impl.md](14_Stage13_SizeAndScope_Impl.md) | [14_Stage13_SizeAndScope_Guide.md](14_Stage13_SizeAndScope_Guide.md) | ✅ готов |
 
-Этапы 0–9 — исходный план. Этапы 10–12 добавлены по запросу после того, как
-расширение попробовали в работе. Отдельно: [PRIVACY.md](PRIVACY.md) — политика
+Этапы 0–9 — исходный план. Этапы 10–13 добавлены по запросу после того, как
+расширение попробовали в работе.
+
+**Этап 3 исключён из дорожной карты.** Режим «вся страница» удалён на этапе 13:
+нагрузка на страницу при большом количестве изображений не оправдывает пользу
+при текущем масштабе проекта. Документы этапа оставлены как история —
+в них разобраны очередь с ограничением параллелизма и панель прогресса,
+и разбор не перестал быть верным оттого, что код удалён. Отдельно: [PRIVACY.md](PRIVACY.md) — политика
 конфиденциальности для публикации.
 
 ## Исправления после этапов

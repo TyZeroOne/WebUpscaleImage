@@ -130,7 +130,15 @@ async function runMlPipeline(
   achieved = ml.scale ** passes
 
   const remaining = options.scale / achieved
-  const needsFinalResize = Math.abs(remaining - 1) > SCALE_TOLERANCE
+  /**
+   * Точный размер, если он задан, доводится последним шагом — и доводится
+   * ровно, а не «в пределах допуска». Пользователь, набравший 1920×1080,
+   * ждёт 1920×1080, а не 1916×1078.
+   */
+  const target = options.targetSize
+  const needsFinalResize = target
+    ? Math.round(width) !== target.width || Math.round(height) !== target.height
+    : Math.abs(remaining - 1) > SCALE_TOLERANCE
 
   let current: EnhanceResult | null = null
   let bitmap = input.bitmap
@@ -153,7 +161,7 @@ async function runMlPipeline(
   const finalBitmap = await createImageBitmap(result.blob)
   const finished = await runClassic(
     { bitmap: finalBitmap, sourceUrl: input.sourceUrl },
-    { ...options, scale: remaining },
+    target ? { ...options, targetSize: target } : { ...options, scale: remaining },
     signal,
   )
 
@@ -374,6 +382,34 @@ export async function runEnhance(
   }
 
   if (operation === 'refine') return runRefine(input, options, model, strength, signal)
+
+  /**
+   * Уменьшение уходит мимо модели целиком, и это не оптимизация, а логика.
+   *
+   * Модель умеет только увеличивать: её последний слой раскладывает каналы
+   * в пиксели с фиксированным коэффициентом. Прогнать картинку через неё,
+   * чтобы потом выбросить большую часть посчитанного, — значит заплатить
+   * за работу, которая гарантированно уйдёт в мусор. Хуже того: выдуманная
+   * моделью микротекстура при уменьшении превратилась бы в шум.
+   *
+   * Уровень качества здесь принудительно поднимается до «качественно».
+   * Причина — не в «пусть будет лучше», а в конкретном дефекте: на уровне
+   * «быстро» масштабирует drawImage, который при уменьшении берёт заранее
+   * посчитанные копии и НЕ растягивает окно фильтра. На мелкой регулярной
+   * структуре это даёт муар — ровно то, чего в уменьшении быть не должно.
+   */
+  if (operation === 'resize' && options.targetSize) {
+    const shrinking =
+      options.targetSize.width <= input.bitmap.width &&
+      options.targetSize.height <= input.bitmap.height
+    if (shrinking) {
+      log.debug(
+        `Уменьшение ${input.bitmap.width}×${input.bitmap.height} → ` +
+          `${options.targetSize.width}×${options.targetSize.height}: без модели, фильтром Ланцоша`,
+      )
+      return runClassic(input, { ...options, level: 'quality' }, signal)
+    }
+  }
 
   /**
    * ML пробуется первым, но только когда он уместен.

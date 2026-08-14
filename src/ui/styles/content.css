@@ -27,8 +27,8 @@
 /* ----------------------------------------------------- кнопки над картинкой */
 
 /*
- * Две кнопки в одной группе: увеличить и улучшить качество. Группа
- * позиционируется целиком, поэтому у кнопок нет собственных координат.
+ * Три кнопки в одной группе: увеличить, улучшить качество, задать размер.
+ * Группа позиционируется целиком, поэтому у кнопок нет собственных координат.
  */
 .actions-group {
   position: fixed;
@@ -241,85 +241,140 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* ------------------------------------------- панель хода обработки страницы */
+/* ----------------------------------------- диалог выбора целевого размера */
 
 /*
- * Левый нижний угол — чтобы не перекрываться с тостами справа.
- * Прогресс должен оставаться виден, даже когда всплывает ошибка
- * по отдельной картинке.
+ * Ширина фиксированная: внутри два поля ввода и ряд пресетов, и «резиновый»
+ * диалог на узкой картинке сложил бы их в нечитаемую колонку.
  */
-.panel {
+.size-dialog {
   position: fixed;
-  left: 16px;
-  bottom: 16px;
-  width: 260px;
-  max-width: calc(100vw - 32px);
-  padding: 12px 14px;
+  width: 240px;
+  padding: 12px;
   border-radius: 12px;
-  background: rgba(20, 22, 28, 0.94);
+  background: rgba(20, 22, 28, 0.96);
   backdrop-filter: blur(6px);
   color: #fff;
   font: 400 12px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
   pointer-events: auto;
   opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 160ms ease, transform 160ms ease;
+  transform: translateY(-4px);
+  transition: opacity 140ms ease, transform 140ms ease;
 }
 
-.panel[data-visible='false'] {
-  /* Скрытая панель не должна ловить клики, пока идёт анимация исчезновения. */
+.size-dialog[data-visible='false'] {
   pointer-events: none;
 }
 
-.panel[data-visible='true'] {
+.size-dialog[data-visible='true'] {
   opacity: 1;
   transform: none;
 }
 
-.panel-title {
+.size-title {
   font-weight: 600;
   font-size: 13px;
 }
 
-.panel-bar {
-  height: 4px;
-  margin: 10px 0 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  overflow: hidden;
-}
-
-.panel-bar i {
-  display: block;
-  height: 100%;
-  width: 0;
-  border-radius: inherit;
-  background: #4f7df3;
-  transition: width 200ms ease;
-}
-
-.panel[data-state='done'] .panel-bar i {
-  background: #4ade80;
-}
-
-.panel[data-state='cancelled'] .panel-bar i {
-  background: #9aa0a6;
-}
-
-.panel-status {
-  color: rgba(255, 255, 255, 0.72);
+.size-source {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.6);
   font-variant-numeric: tabular-nums;
 }
 
-.panel-actions {
+.size-presets {
+  display: flex;
+  gap: 4px;
+  margin: 10px 0 8px;
+}
+
+.size-preset {
+  flex: 1;
+  padding: 4px 0;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.size-preset:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.size-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.size-field {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.size-field:focus {
+  outline: none;
+  border-color: #4f7df3;
+}
+
+.size-times {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.size-lock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+}
+
+/*
+ * Вывод о направлении — единственная строка, которая меняет цвет.
+ * Увеличение и уменьшение это не «хорошо» и «плохо», поэтому оба цвета
+ * нейтральные по смыслу: синий и жёлтый, а не зелёный и красный.
+ */
+.size-verdict {
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.size-verdict[data-direction='up'] {
+  color: #8fb0ff;
+}
+
+.size-verdict[data-direction='down'] {
+  color: #f0c674;
+}
+
+.size-verdict[data-direction='same'] {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.size-buttons {
   display: flex;
   gap: 6px;
   margin-top: 10px;
 }
 
-.panel-actions button {
-  padding: 4px 10px;
+.size-buttons button {
+  flex: 1;
+  padding: 5px 10px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 6px;
   background: transparent;
@@ -329,13 +384,19 @@
   cursor: pointer;
 }
 
-.panel-actions button:hover {
+.size-buttons button:hover:not(:disabled) {
   border-color: rgba(255, 255, 255, 0.6);
   background: rgba(255, 255, 255, 0.12);
 }
 
-.panel-actions button[hidden] {
-  display: none;
+.size-buttons .size-apply {
+  border-color: transparent;
+  background: #4f7df3;
+}
+
+.size-buttons button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /*
@@ -347,8 +408,7 @@
   .actions-group,
   .toast,
   .highlight,
-  .panel,
-  .panel-bar i {
+  .size-dialog {
     transition: none;
   }
 

@@ -45,6 +45,27 @@ export function resolveTargetSize(
   }
 }
 
+/**
+ * Тот же потолок памяти, но для явно заданного размера.
+ *
+ * Пропорции сохраняются: если ужимать только одну сторону, картинка
+ * исказится, а пользователь просил размер, а не искажение.
+ */
+function clampToMemoryLimit(target: { width: number; height: number }): {
+  width: number
+  height: number
+  appliedScale: number
+} {
+  const pixels = target.width * target.height
+  if (pixels <= MAX_OUTPUT_PIXELS) return { ...target, appliedScale: 1 }
+  const factor = Math.sqrt(MAX_OUTPUT_PIXELS / pixels)
+  return {
+    width: Math.max(1, Math.round(target.width * factor)),
+    height: Math.max(1, Math.round(target.height * factor)),
+    appliedScale: factor,
+  }
+}
+
 function assertNotAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw new DOMException('Обработка отменена', 'AbortError')
 }
@@ -98,7 +119,14 @@ export class CanvasEnhancer implements ImageEnhancer {
   ): Promise<EnhanceResult> {
     const startedAt = performance.now()
     const { bitmap } = input
-    const target = resolveTargetSize(bitmap.width, bitmap.height, options.scale)
+    /**
+     * Явно заданный размер важнее коэффициента: пользователь мог задать
+     * стороны, не связанные одним множителем. Потолок по памяти
+     * применяется и к нему — иначе опечатка в поле ввода уронила бы вкладку.
+     */
+    const target = options.targetSize
+      ? clampToMemoryLimit(options.targetSize)
+      : resolveTargetSize(bitmap.width, bitmap.height, options.scale)
 
     assertNotAborted(signal)
 
@@ -184,6 +212,22 @@ export class CanvasEnhancer implements ImageEnhancer {
     const sourceData = sourceCtx.getImageData(0, 0, bitmap.width, bitmap.height)
     assertNotAborted(signal)
 
+    /**
+     * Уменьшение считается ТЕМ ЖЕ вызовом, что и увеличение, и это
+     * не упрощение, а результат замера.
+     *
+     * Напрашивается дробить сильное уменьшение на шаги по два раза: при
+     * коэффициенте 8 и радиусе 3 окно фильтра разрастается до 49 отсчётов
+     * по каждой оси, и кажется, что три дешёвых прохода выгоднее одного
+     * дорогого. Такой вариант был написан и измерен — см. этап 13.
+     * Разницы в муаре нет вовсе (0.36 против 0.36), а по времени пошаговый
+     * вариант оказался чуть ХУЖЕ: 601 мс против 565.
+     *
+     * Причина в том, что вся защита от муара уже сидит в buildWeights:
+     * при коэффициенте меньше единицы окно растягивается в 1/scale раз,
+     * и каждый выходной пиксель усредняет ровно столько входных, сколько
+     * в него попало. Дробить нечего — фильтр и так корректен.
+     */
     const resampled = resampleLanczos(sourceData, width, height, radius)
 
     const canvas = new OffscreenCanvas(width, height)

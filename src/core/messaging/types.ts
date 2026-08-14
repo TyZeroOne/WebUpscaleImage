@@ -80,18 +80,6 @@ export interface MessageContracts {
       | { ok: true; dataUrl: string; bytes: number }
       | { ok: false; reason: 'network' | 'too-large' | 'not-image' | 'unsupported-scheme' }
   }
-
-  /**
-   * Запуск режима «вся страница». Приходит из popup или из контекстного меню.
-   *
-   * Ответ возвращается СРАЗУ, до окончания работы: очередь может выполняться
-   * минутами, а popup закрывается через доли секунды после клика — ждать
-   * завершения было бы некому.
-   */
-  ENHANCE_PAGE: {
-    request: { operation: EnhanceOperation }
-    response: { started: boolean; total: number; reason?: string }
-  }
 }
 
 export type MessageKind = keyof MessageContracts

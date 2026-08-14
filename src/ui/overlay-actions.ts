@@ -33,17 +33,29 @@ const ICON_REFINE = `
   <path d="M16 16l.6-1.4 1.4-.6-1.4-.6L16 12l-.6 1.4-1.4.6 1.4.6L16 16Z" fill="currentColor"/>
 </svg>`
 
+/**
+ * Иконка выбора размера: рамка и уголки, как у инструмента кадрирования.
+ * Стрелок нет намеренно — направление здесь не выбирают, оно выводится
+ * из введённых чисел.
+ */
+const ICON_RESIZE = `
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+  <path d="M7 10V9h2M17 14v1h-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 15l8-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>`
+
 /** Отступ группы от края картинки, px. */
 const INSET_PX = 8
 
 /**
  * Ниже этой ширины подписи убираются, остаются только иконки.
  *
- * Порог выше прежнего (148), потому что кнопок стало две: с подписями
- * группа занимает около 230 px, и на картинке в 250 px она закрыла бы
- * почти всё.
+ * Порог рос вместе с числом кнопок: 148 при одной, 260 при двух,
+ * 340 при трёх. С подписями группа занимает около 320 px, и на картинке
+ * в 340 px она закрыла бы почти всё.
  */
-const COMPACT_BELOW_PX = 260
+const COMPACT_BELOW_PX = 340
 
 export interface OverlayActions {
   /** Показать группу в правом верхнем углу указанного прямоугольника. */
@@ -77,7 +89,8 @@ export function createOverlayActions(layer: HTMLElement): OverlayActions {
 
   const upscale = createButton('upscale', ICON_UPSCALE, 'overlayEnhance', 'overlayEnhanceAria')
   const refine = createButton('refine', ICON_REFINE, 'overlayRefine', 'overlayRefineAria')
-  group.append(upscale, refine)
+  const resize = createButton('resize', ICON_RESIZE, 'overlayResize', 'overlayResizeAria')
+  group.append(upscale, refine, resize)
   layer.append(group)
 
   return {

@@ -7,13 +7,33 @@
   "actionTitle": { "message": "ImageEnhancer" },
   "menuEnhanceImage": { "message": "Upscale this image" },
   "menuRefineImage": { "message": "Improve quality without resizing" },
-  "menuEnhancePage": { "message": "Upscale all images on this page" },
-  "menuRefinePage": { "message": "Improve quality of all images" },
 
   "overlayEnhance": { "message": "Upscale" },
   "overlayEnhanceAria": { "message": "Upscale this image" },
   "overlayRefine": { "message": "Quality" },
   "overlayRefineAria": { "message": "Improve quality without resizing" },
+  "overlayResize": { "message": "Size" },
+  "overlayResizeAria": { "message": "Resize to a specific resolution" },
+
+  "sizeDialogTitle": { "message": "Target resolution" },
+  "sizeSource": {
+    "message": "Now: $SIZE$",
+    "placeholders": { "size": { "content": "$1", "example": "800×600" } }
+  },
+  "sizeWidth": { "message": "Width" },
+  "sizeHeight": { "message": "Height" },
+  "sizeKeepRatio": { "message": "Keep aspect ratio" },
+  "sizeApply": { "message": "Apply" },
+  "sizeCancel": { "message": "Cancel" },
+  "sizeVerdictUp": {
+    "message": "Enlarging ×$FACTOR$ — neural network or filter",
+    "placeholders": { "factor": { "content": "$1", "example": "2.4" } }
+  },
+  "sizeVerdictDown": {
+    "message": "Shrinking to $FACTOR$ of the original — filter only, no network",
+    "placeholders": { "factor": { "content": "$1", "example": "0.35" } }
+  },
+  "sizeSame": { "message": "That is the current size — nothing to change" },
   "videoBadge": { "message": "Video — coming soon" },
 
   "toastProcessing": {
@@ -37,9 +57,6 @@
   },
   "actionDownload": { "message": "Download" },
   "actionRestore": { "message": "Undo" },
-  "actionRestoreAll": { "message": "Undo all" },
-  "actionCancel": { "message": "Cancel" },
-  "actionClose": { "message": "Close" },
 
   "errAlreadyRunning": { "message": "This image is already being processed." },
   "errNotLoaded": { "message": "The image hasn't loaded yet. Try again." },
@@ -62,49 +79,6 @@
     "message": "This image is too large for the selected model on this device, and sharpening is off. Raise the sharpness in settings — it works at any size."
   },
 
-  "pageBusy": { "message": "This page is already being processed." },
-  "pageNoImages": { "message": "No suitable images found." },
-  "pageAllBigEnough": { "message": "All images are already the target size." },
-  "pageBatchTrimmed": {
-    "message": "Too many images for one run. Took the first $TAKEN$, skipped $SKIPPED$.",
-    "placeholders": {
-      "taken": { "content": "$1", "example": "50" },
-      "skipped": { "content": "$2", "example": "12" }
-    }
-  },
-  "pageRestored": {
-    "message": "Images restored: $COUNT$.",
-    "placeholders": { "count": { "content": "$1", "example": "13" } }
-  },
-  "failureGrouped": {
-    "message": "$REASON$ ($COUNT$ images)",
-    "placeholders": {
-      "reason": { "content": "$1" },
-      "count": { "content": "$2", "example": "7" }
-    }
-  },
-
-  "panelRunning": { "message": "Enhancing images" },
-  "panelDone": { "message": "Done" },
-  "panelCancelled": { "message": "Processing stopped" },
-  "panelProgress": {
-    "message": "$DONE$ of $TOTAL$",
-    "placeholders": {
-      "done": { "content": "$1", "example": "12" },
-      "total": { "content": "$2", "example": "40" }
-    }
-  },
-  "panelProgressSkipped": {
-    "message": "$DONE$ of $TOTAL$ · skipped: $FAILED$",
-    "placeholders": {
-      "done": { "content": "$1", "example": "12" },
-      "total": { "content": "$2", "example": "40" },
-      "failed": { "content": "$3", "example": "2" }
-    }
-  },
-
-  "popupEnhancePage": { "message": "Upscale all on this page" },
-  "popupRefinePage": { "message": "Improve quality of all" },
   "popupSettings": { "message": "Settings" },
   "popupQuality": { "message": "Quality level" },
   "popupImages": { "message": "Images on page" },

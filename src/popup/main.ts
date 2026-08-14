@@ -1,6 +1,5 @@
 import '@/ui/styles/base.css'
 import { detectCapabilities, recommendLevel } from '@/core/device'
-import type { EnhanceOperation } from '@/core/enhance'
 import { applyI18n, t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import { sendToBackground, sendToTab } from '@/core/messaging'
@@ -11,8 +10,11 @@ import { getSettings } from '@/core/settings'
  *
  * Важно про жизненный цикл: popup — это полноценный документ, который
  * УНИЧТОЖАЕТСЯ при каждом закрытии. Долгие операции здесь запускать нельзя,
- * они прервутся на полуслове. Поэтому очередь обработки живёт в content
- * script, а popup только показывает состояние и запускает работу.
+ * они прервутся на полуслове.
+ *
+ * Начиная с этапа 13 popup ничего не запускает вовсе: массовой обработки
+ * больше нет, а обработка одной картинки начинается там, где эта картинка
+ * выбрана — на самой странице. Popup остался справкой о состоянии.
  */
 
 const log = createLogger('popup')
@@ -73,41 +75,16 @@ async function activeTabId(): Promise<number | undefined> {
 
 async function scanActiveTab(): Promise<void> {
   const tabId = await activeTabId()
-  const buttons = ['enhance-page', 'refine-page'].map(
-    (id) => document.getElementById(id) as HTMLButtonElement | null,
-  )
-  const setDisabled = (value: boolean): void => {
-    for (const button of buttons) if (button) button.disabled = value
-  }
-
   const result = tabId === undefined ? null : await sendToTab(tabId, 'SCAN_PAGE', {})
   if (!result) {
     // Штатная ситуация: служебная страница (chrome://, страница настроек,
     // Chrome Web Store), куда content script не внедряется по правилам Chrome.
     setText('page-images', t('popupNoAccess'))
     setText('page-videos', t('popupNoAccess'))
-    setDisabled(true)
     return
   }
   setText('page-images', String(result.images))
   setText('page-videos', String(result.videos))
-  // Нечего обрабатывать — кнопки не должны выглядеть рабочими.
-  setDisabled(result.images === 0)
-}
-
-/**
- * Запуск режима «вся страница».
- *
- * Popup закрывается сразу после отправки: он уничтожается при любом клике
- * вне себя, и держать его открытым на всё время обработки невозможно.
- * Прогресс показывает панель на самой странице — она переживёт и закрытие
- * popup, и переключение вкладок.
- */
-async function startPageEnhance(operation: EnhanceOperation): Promise<void> {
-  const tabId = await activeTabId()
-  if (tabId === undefined) return
-  await sendToTab(tabId, 'ENHANCE_PAGE', { operation })
-  window.close()
 }
 
 applyI18n()
@@ -119,12 +96,4 @@ void scanActiveTab().catch((error: unknown) => log.error('Опрос вклад�
 
 document.getElementById('open-options')?.addEventListener('click', () => {
   void chrome.runtime.openOptionsPage()
-})
-
-document.getElementById('enhance-page')?.addEventListener('click', () => {
-  void startPageEnhance('upscale').catch((error: unknown) => log.error('Запуск не удался:', error))
-})
-
-document.getElementById('refine-page')?.addEventListener('click', () => {
-  void startPageEnhance('refine').catch((error: unknown) => log.error('Запуск не удался:', error))
 })

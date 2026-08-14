@@ -4,14 +4,13 @@ import { registerMessageHandlers, sendToBackground } from '@/core/messaging'
 import { getSettings } from '@/core/settings'
 import { createHighlight } from '@/ui/highlight'
 import { createOverlayActions } from '@/ui/overlay-actions'
-import { createProgressPanel } from '@/ui/progress-panel'
+import { createSizeDialog } from '@/ui/size-dialog'
 import { createToaster } from '@/ui/toast'
 import { createVideoBadge } from '@/ui/video-badge'
 import { VIDEO_ENHANCEMENT_ENABLED, videoBadgeMode } from '@/video'
 import { findImageBySource, scanMedia } from './detect'
 import { createEnhanceFlow } from './enhance-flow'
 import { createHoverTracker } from './hover'
-import { createPageFlow } from './page-flow'
 import { getUiRoot } from './ui-root'
 
 /**
@@ -36,7 +35,7 @@ function bootstrapUi(): void {
   const actions = createOverlayActions(layer)
   const toaster = createToaster(layer)
   const highlight = createHighlight(layer)
-  const panel = createProgressPanel(layer)
+  const sizeDialog = createSizeDialog(layer)
   const badge = createVideoBadge(layer, videoBadgeMode() === 'interactive')
 
   let hovered: HTMLImageElement | null = null
@@ -57,11 +56,31 @@ function bootstrapUi(): void {
 
   /** Общая точка обработки — и для кнопки, и для контекстного меню (DRY). */
   const enhanceImage = createEnhanceFlow({ toaster })
-  const enhancePage = createPageFlow({ panel, toaster })
+
+  /**
+   * Кнопка «Размер» не запускает обработку, а открывает диалог.
+   *
+   * Картинка запоминается отдельно: пока пользователь набирает числа,
+   * курсор давно ушёл с картинки, и `hovered` успеет обнулиться.
+   */
+  let sizeTarget: HTMLImageElement | null = null
 
   actions.onAction((operation) => {
     if (!hovered) return
+    if (operation === 'resize') {
+      sizeTarget = hovered
+      sizeDialog.open(hovered.getBoundingClientRect(), {
+        width: hovered.naturalWidth,
+        height: hovered.naturalHeight,
+      })
+      return
+    }
     void enhanceImage(hovered, 'overlay', operation)
+  })
+
+  sizeDialog.onApply((target) => {
+    if (!sizeTarget) return
+    void enhanceImage(sizeTarget, 'overlay', 'resize', target)
   })
 
   // Контекстное меню приходит из service worker'а: сам пункт меню живёт там,
@@ -83,14 +102,6 @@ function bootstrapUi(): void {
     SCAN_PAGE: () => {
       const media = scanMedia()
       return { url: location.href, images: media.images.length, videos: media.videos.length }
-    },
-
-    ENHANCE_PAGE: async (payload) => {
-      const result = await enhancePage(payload.operation)
-      if (!result.started && result.reason) {
-        toaster.show(result.reason, { tone: 'error' })
-      }
-      return result
     },
   })
 }

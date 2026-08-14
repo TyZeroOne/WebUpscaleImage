@@ -7,13 +7,33 @@
   "actionTitle": { "message": "ImageEnhancer" },
   "menuEnhanceImage": { "message": "Увеличить это изображение" },
   "menuRefineImage": { "message": "Улучшить качество без изменения размера" },
-  "menuEnhancePage": { "message": "Увеличить все изображения на странице" },
-  "menuRefinePage": { "message": "Улучшить качество всех изображений" },
 
   "overlayEnhance": { "message": "Увеличить" },
   "overlayEnhanceAria": { "message": "Увеличить это изображение" },
   "overlayRefine": { "message": "Качество" },
   "overlayRefineAria": { "message": "Улучшить качество без изменения размера" },
+  "overlayResize": { "message": "Размер" },
+  "overlayResizeAria": { "message": "Привести к заданному разрешению" },
+
+  "sizeDialogTitle": { "message": "Целевое разрешение" },
+  "sizeSource": {
+    "message": "Сейчас: $SIZE$",
+    "placeholders": { "size": { "content": "$1", "example": "800×600" } }
+  },
+  "sizeWidth": { "message": "Ширина" },
+  "sizeHeight": { "message": "Высота" },
+  "sizeKeepRatio": { "message": "Сохранять пропорции" },
+  "sizeApply": { "message": "Применить" },
+  "sizeCancel": { "message": "Отмена" },
+  "sizeVerdictUp": {
+    "message": "Увеличение в $FACTOR$ раза — нейросеть или фильтр",
+    "placeholders": { "factor": { "content": "$1", "example": "2.4" } }
+  },
+  "sizeVerdictDown": {
+    "message": "Уменьшение до $FACTOR$ от исходного — только фильтр, без нейросети",
+    "placeholders": { "factor": { "content": "$1", "example": "0.35" } }
+  },
+  "sizeSame": { "message": "Это текущий размер — менять нечего" },
   "videoBadge": { "message": "Видео — скоро" },
 
   "toastProcessing": {
@@ -37,9 +57,6 @@
   },
   "actionDownload": { "message": "Скачать" },
   "actionRestore": { "message": "Вернуть" },
-  "actionRestoreAll": { "message": "Вернуть все" },
-  "actionCancel": { "message": "Отмена" },
-  "actionClose": { "message": "Закрыть" },
 
   "errAlreadyRunning": { "message": "Эта картинка уже обрабатывается." },
   "errNotLoaded": { "message": "Картинка ещё не загрузилась. Попробуйте ещё раз." },
@@ -62,49 +79,6 @@
     "message": "Картинка слишком велика для выбранной модели на этом устройстве, а резкость выключена. Поднимите резкость в настройках — она работает на любом размере."
   },
 
-  "pageBusy": { "message": "Обработка страницы уже идёт." },
-  "pageNoImages": { "message": "Подходящих картинок не найдено." },
-  "pageAllBigEnough": { "message": "Все картинки уже нужного размера." },
-  "pageBatchTrimmed": {
-    "message": "Картинок больше, чем можно обработать за раз. Взяты первые $TAKEN$, пропущено $SKIPPED$.",
-    "placeholders": {
-      "taken": { "content": "$1", "example": "50" },
-      "skipped": { "content": "$2", "example": "12" }
-    }
-  },
-  "pageRestored": {
-    "message": "Восстановлено картинок: $COUNT$.",
-    "placeholders": { "count": { "content": "$1", "example": "13" } }
-  },
-  "failureGrouped": {
-    "message": "$REASON$ (картинок: $COUNT$)",
-    "placeholders": {
-      "reason": { "content": "$1" },
-      "count": { "content": "$2", "example": "7" }
-    }
-  },
-
-  "panelRunning": { "message": "Улучшаю изображения" },
-  "panelDone": { "message": "Готово" },
-  "panelCancelled": { "message": "Обработка остановлена" },
-  "panelProgress": {
-    "message": "$DONE$ из $TOTAL$",
-    "placeholders": {
-      "done": { "content": "$1", "example": "12" },
-      "total": { "content": "$2", "example": "40" }
-    }
-  },
-  "panelProgressSkipped": {
-    "message": "$DONE$ из $TOTAL$ · пропущено: $FAILED$",
-    "placeholders": {
-      "done": { "content": "$1", "example": "12" },
-      "total": { "content": "$2", "example": "40" },
-      "failed": { "content": "$3", "example": "2" }
-    }
-  },
-
-  "popupEnhancePage": { "message": "Увеличить все на странице" },
-  "popupRefinePage": { "message": "Улучшить качество всех" },
   "popupSettings": { "message": "Настройки" },
   "popupQuality": { "message": "Уровень качества" },
   "popupImages": { "message": "Изображений на странице" },

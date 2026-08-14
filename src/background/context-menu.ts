@@ -17,44 +17,21 @@ import { sendToTab } from '@/core/messaging'
 const log = createLogger('context-menu')
 
 /**
- * Пункты описаны данными, а не четырьмя copy-paste блоками.
+ * Пункты описаны данными, а не двумя copy-paste блоками.
  *
- * С появлением второго действия («улучшить качество») число пунктов
- * удвоилось: два действия на картинку и два на страницу. Держать это
- * списком дешевле, чем восемью почти одинаковыми вызовами.
+ * Их было четыре, пока существовал режим «вся страница». Осталось два —
+ * два действия над одной картинкой. Списком по-прежнему короче и,
+ * главное, невозможно создать пункт и забыть его обработать.
  */
 interface MenuItem {
   id: string
   titleKey: string
-  context: 'image' | 'page'
   operation: EnhanceOperation
 }
 
 const ITEMS: MenuItem[] = [
-  {
-    id: 'image-enhancer:image-upscale',
-    titleKey: 'menuEnhanceImage',
-    context: 'image',
-    operation: 'upscale',
-  },
-  {
-    id: 'image-enhancer:image-refine',
-    titleKey: 'menuRefineImage',
-    context: 'image',
-    operation: 'refine',
-  },
-  {
-    id: 'image-enhancer:page-upscale',
-    titleKey: 'menuEnhancePage',
-    context: 'page',
-    operation: 'upscale',
-  },
-  {
-    id: 'image-enhancer:page-refine',
-    titleKey: 'menuRefinePage',
-    context: 'page',
-    operation: 'refine',
-  },
+  { id: 'image-enhancer:image-upscale', titleKey: 'menuEnhanceImage', operation: 'upscale' },
+  { id: 'image-enhancer:image-refine', titleKey: 'menuRefineImage', operation: 'refine' },
 ]
 
 const BY_ID = new Map(ITEMS.map((item) => [item.id, item]))
@@ -80,12 +57,11 @@ export function registerContextMenu(): void {
           id: item.id,
           title: t(item.titleKey),
           /**
-           * Контекст 'image' — правый клик по <img>, Chrome кладёт адрес
-           * в info.srcUrl. Контекст 'page' — клик не по картинке, ссылке,
-           * выделению или полю ввода. Они взаимно исключают друг друга,
-           * поэтому в меню одновременно видны только два пункта из четырёх.
+           * Только 'image': правый клик по <img>, Chrome кладёт адрес
+           * в info.srcUrl. На пустом месте страницы пунктов больше нет —
+           * обрабатывать нечего, картинка не выбрана.
            */
-          contexts: [item.context],
+          contexts: ['image'],
         })
       }
     })
@@ -99,15 +75,6 @@ export function registerContextMenu(): void {
 
     if (tab?.id === undefined) {
       log.warn('Клик по пункту меню без вкладки — игнорирую')
-      return
-    }
-
-    if (item.context === 'page') {
-      void sendToTab(tab.id, 'ENHANCE_PAGE', { operation: item.operation }).then((response) => {
-        if (response && !response.started) {
-          log.warn(`Режим «вся страница» не запустился: ${response.reason ?? 'причина неизвестна'}`)
-        }
-      })
       return
     }
 
