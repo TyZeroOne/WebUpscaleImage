@@ -218,22 +218,12 @@ label.ie-choice input {
   gap: 8px;
 }
 
-input[type='number'] {
-  width: 88px;
-  padding: 4px 6px;
-  border: 1px solid var(--ie-border);
-  border-radius: 6px;
-  background: var(--ie-bg);
-  color: var(--ie-fg);
-  font: inherit;
-  text-align: right;
-}
-
-input[type='number']:focus {
-  outline: none;
-  border-color: var(--ie-accent);
-}
-
+/*
+ * Ряд «сила эффекта» скрывается, когда выбрана не GAN-модель.
+ * Правило явное, а не на умолчании браузера: у списка задан свой
+ * отступ, и полагаться на то, что [hidden] переживёт любую будущую
+ * правку .ie-rows, не стоит.
+ */
 ul.ie-rows[hidden] {
   display: none;
 }

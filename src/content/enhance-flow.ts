@@ -1,10 +1,4 @@
-import {
-  NothingToDoError,
-  resolvePlan,
-  resolveScale,
-  resolveTargetScale,
-  resolveTargetSize,
-} from '@/core/enhance'
+import { NothingToDoError, resolvePlan, resolveScale, resolveTargetSize } from '@/core/enhance'
 import type { EnhanceOperation, NothingToDoReason, QualityLevel, TargetSize } from '@/core/enhance'
 import type { Settings } from '@/core/settings'
 import { getSettings } from '@/core/settings'
@@ -89,8 +83,8 @@ export function describeFailure(error: unknown): string {
   if (error instanceof AlreadyRunningError) return t('errAlreadyRunning')
   if (error instanceof NothingToDoError) {
     switch (error.reason) {
-      case 'already-big-enough':
-        return t('errAlreadyBigEnough')
+      case 'same-size':
+        return t('errSameSize')
       case 'refine-no-op':
         return t('errRefineNoOp')
       case 'refine-too-large':
@@ -185,7 +179,7 @@ export function planEnhance(
       scale: targetSize.width / Math.max(1, image.naturalWidth),
       width: targetSize.width,
       height: targetSize.height,
-      skip: same ? 'already-big-enough' : null,
+      skip: same ? 'same-size' : null,
       targetSize,
     }
   }
@@ -207,23 +201,15 @@ export function planEnhance(
 
   const maxScale = resolvePlan(level).maxScale
 
-  if (settings.targetMode === 'longest-side') {
-    const plan = resolveTargetScale(
-      image.naturalWidth,
-      image.naturalHeight,
-      settings.targetPx,
-      settings.skipIfLargeEnough,
-      maxScale,
-    )
-    const target = resolveTargetSize(image.naturalWidth, image.naturalHeight, plan.scale)
-    return {
-      scale: plan.scale,
-      width: target.width,
-      height: target.height,
-      skip: plan.skip ? 'already-big-enough' : null,
-    }
-  }
-
+  /**
+   * Кнопка «Увеличить» считает коэффициент от того, насколько картинке
+   * не хватает пикселей на экране, и другого режима у неё больше нет.
+   *
+   * Настройка «привести длинную сторону к N» удалена на этапе 13:
+   * с появлением диалога размера она стала вторым, спрятанным местом,
+   * определяющим то же самое. Кто хочет конкретное число — называет его
+   * в диалоге; кнопка же означает ровно «сделай побольше».
+   */
   const displayWidth = image.getBoundingClientRect().width
   const scale = resolveScale(displayWidth, image.naturalWidth, window.devicePixelRatio, maxScale)
   const target = resolveTargetSize(image.naturalWidth, image.naturalHeight, scale)

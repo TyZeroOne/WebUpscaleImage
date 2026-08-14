@@ -71,7 +71,7 @@
   "errGeneric": { "message": "Couldn't process this image." },
   "errImageNotFound": { "message": "Couldn't find that image on the page." },
 
-  "errAlreadyBigEnough": { "message": "This image is already the target size — nothing to do." },
+  "errSameSize": { "message": "This image is already the target size — nothing to do." },
   "errRefineNoOp": {
     "message": "Nothing to improve with: sharpening is off and the selected network adds no detail. Raise the sharpness, or pick Real-ESRGAN or the detailed model in settings."
   },
@@ -154,21 +154,6 @@
   "sharpen": { "message": "Unsharp mask" },
   "sharpenHint": {
     "message": "Boosts brightness transitions at edges after upscaling. Unlike the neural network it invents nothing — it only emphasises what is already there. All the models deliberately leave sharpening alone. Above 60% on compressed images, light halos start to appear around high-contrast edges. For the \"Quality\" button with the light or medium model this is the only tool that does anything: at zero it will change nothing."
-  },
-
-  "sectionTarget": { "message": "Output size" },
-  "targetAuto": { "message": "Automatic" },
-  "targetAutoHint": {
-    "message": "The factor is derived from how many pixels the image lacks on screen."
-  },
-  "targetLongestSide": { "message": "Fit the longest side to" },
-  "targetLongestSideHint": {
-    "message": "Images smaller than the target are enlarged, larger ones are shrunk. Longest side rather than width: otherwise portrait images would grow disproportionately."
-  },
-  "targetPxLabel": { "message": "Pixels on the longest side" },
-  "optSkipIfLargeEnough": { "message": "Leave images that already meet the target" },
-  "optSkipIfLargeEnoughHint": {
-    "message": "If off, larger images are shrunk down to the target size."
   },
 
   "optReplaceOnPage": { "message": "Replace the image on the page" },

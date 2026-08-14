@@ -176,14 +176,40 @@ export function createSizeDialog(layer: HTMLElement): SizeDialog {
     renderVerdict()
   }
 
+  /**
+   * Парное поле пересчитывается ТОЛЬКО когда введённое число уже осмысленно.
+   *
+   * Иначе выходит вот что: пользователь набирает «120» и после первого
+   * же символа получает в полях «16 × 1» — единица меньше минимума,
+   * её зажало до 16, а исходное поле осталось как есть. Числа перестают
+   * быть связаны, и картина на экране выглядит сломанной, хотя человек
+   * просто не дописал.
+   *
+   * Само редактируемое поле при вводе не трогаем никогда: подставлять
+   * туда что-то, пока курсор внутри, — верный способ сломать набор.
+   */
+  const inRange = (value: number): boolean =>
+    Number.isFinite(value) && value >= MIN_SIDE && value <= MAX_SIDE
+
   widthInput.addEventListener('input', () => {
-    if (lock.checked) heightInput.value = String(clampSide(Number(widthInput.value) / ratio()))
+    const value = Number(widthInput.value)
+    if (lock.checked && inRange(value)) heightInput.value = String(clampSide(value / ratio()))
     renderVerdict()
   })
   heightInput.addEventListener('input', () => {
-    if (lock.checked) widthInput.value = String(clampSide(Number(heightInput.value) * ratio()))
+    const value = Number(heightInput.value)
+    if (lock.checked && inRange(value)) widthInput.value = String(clampSide(value * ratio()))
     renderVerdict()
   })
+
+  // А вот когда поле покинули — приводим его в допустимые границы:
+  // к этому моменту человек уже дописал.
+  for (const input of [widthInput, heightInput]) {
+    input.addEventListener('change', () => {
+      input.value = String(clampSide(Number(input.value)))
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
   lock.addEventListener('change', () => {
     // Включили сохранение пропорций — приводим высоту к ширине сразу,
     // а не при следующем вводе: иначе галочка выглядит неработающей.

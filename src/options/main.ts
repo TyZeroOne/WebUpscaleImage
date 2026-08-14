@@ -3,7 +3,6 @@ import { detectCapabilities, recommendLevel } from '@/core/device'
 import { applyI18n, t } from '@/core/i18n'
 import { createLogger } from '@/core/log'
 import {
-  DEFAULT_SETTINGS,
   type QualityPreference,
   type Settings,
   getSettings,
@@ -89,7 +88,6 @@ async function init(): Promise<void> {
   const radioGroups: [string, keyof Settings][] = [
     ['quality', 'quality'],
     ['model', 'model'],
-    ['targetMode', 'targetMode'],
   ]
   for (const [group, key] of radioGroups) {
     for (const input of document.querySelectorAll<HTMLInputElement>(`input[name="${group}"]`)) {
@@ -97,30 +95,24 @@ async function init(): Promise<void> {
       input.addEventListener('change', () => {
         if (!input.checked) return
         void patchSettings({ [key]: input.value as QualityPreference })
-          .then(() => syncTargetVisibility(input.value))
+          .then(() => syncStrengthVisibility(input.value))
           .catch((error: unknown) => log.error('Не удалось сохранить настройку:', error))
       })
     }
   }
 
   /**
-   * Поле размера и галочка пропуска имеют смысл только при выборе
-   * «привести к размеру», а сила эффекта — только у GAN-модели. Скрываем,
-   * а не блокируем: неактивное поле выглядит как что-то, что вот-вот
-   * заработает, и заставляет искать способ его включить.
+   * Сила эффекта имеет смысл только у GAN-модели. Скрываем, а не блокируем:
+   * неактивное поле выглядит как что-то, что вот-вот заработает,
+   * и заставляет искать способ его включить.
    */
-  const targetExtra = document.getElementById('target-extra')
   const strengthRow = document.getElementById('strength-row')
-  function syncTargetVisibility(value: string): void {
-    if (targetExtra && (value === 'auto' || value === 'longest-side')) {
-      targetExtra.hidden = value !== 'longest-side'
-    }
-    if (strengthRow && ['slim', 'medium', 'detailed'].includes(value)) {
+  function syncStrengthVisibility(value: string): void {
+    if (strengthRow && ['slim', 'medium', 'detailed', 'real'].includes(value)) {
       strengthRow.hidden = value !== 'detailed'
     }
   }
-  syncTargetVisibility(settings.targetMode)
-  syncTargetVisibility(settings.model)
+  syncStrengthVisibility(settings.model)
 
   /**
    * Ползунки процентов. Число рядом обновляется на каждое движение,
@@ -149,27 +141,7 @@ async function init(): Promise<void> {
     })
   }
 
-  const targetPx = document.getElementById('target-px')
-  if (targetPx instanceof HTMLInputElement) {
-    targetPx.value = String(settings.targetPx)
-    /**
-     * Сохраняем по 'change', а не по 'input': иначе при наборе «1920»
-     * в хранилище последовательно улетели бы 1, 19, 192 и 1920, и каждое
-     * из них сбросило бы кеш настроек во всех вкладках.
-     */
-    targetPx.addEventListener('change', () => {
-      const value = Number(targetPx.value)
-      // Поле ввода можно обойти вставкой, поэтому границы проверяются и здесь.
-      const clamped = Math.min(8192, Math.max(64, Math.round(value) || DEFAULT_SETTINGS.targetPx))
-      targetPx.value = String(clamped)
-      void patchSettings({ targetPx: clamped })
-        .then(() => flashSaved(saveStateFor(targetPx)))
-        .catch((error: unknown) => log.error('Не удалось сохранить размер:', error))
-    })
-  }
-
   const toggles: [string, keyof Settings][] = [
-    ['skip-if-large', 'skipIfLargeEnough'],
     ['replace-on-page', 'replaceOnPage'],
     ['verbose-logging', 'verboseLogging'],
   ]

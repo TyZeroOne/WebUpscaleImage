@@ -35,16 +35,6 @@ export type QualityPreference = QualityLevel | 'auto'
  */
 export type ModelChoice = 'slim' | 'medium' | 'detailed' | 'real'
 
-/**
- * Как выбирается размер результата.
- *
- * 'auto'         — как раньше: коэффициент считается от того, насколько
- *                  картинке не хватает пикселей на экране.
- * 'longest-side' — привести длинную сторону к заданному числу. Может как
- *                  увеличить, так и уменьшить.
- */
-export type TargetMode = 'auto' | 'longest-side'
-
 export interface Settings {
   /** Подробные логи в консоли. Нужен, когда пользователь присылает баг-репорт. */
   verboseLogging: boolean
@@ -70,12 +60,6 @@ export interface Settings {
    * которые в картинке уже есть.
    */
   sharpen: number
-  /** Как определять размер результата. */
-  targetMode: TargetMode
-  /** Желаемая длинная сторона в пикселях. Имеет смысл только при 'longest-side'. */
-  targetPx: number
-  /** Не трогать картинки, которые уже не меньше цели. */
-  skipIfLargeEnough: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -124,13 +108,6 @@ export const DEFAULT_SETTINGS: Settings = {
    * ореолы вокруг контрастных краёв.
    */
   sharpen: 30,
-  targetMode: 'auto',
-  /**
-   * 1920 — ширина распространённого монитора. Значение видно и правится
-   * пользователем; оно лишь стартовая точка, а не рекомендация.
-   */
-  targetPx: 1920,
-  skipIfLargeEnough: true,
 }
 
 /**

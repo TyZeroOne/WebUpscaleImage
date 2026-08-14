@@ -34,8 +34,7 @@ export type EnhanceOperation = 'upscale' | 'refine' | 'resize'
 /**
  * Почему запрошенная работа не изменила бы картинку.
  *
- * 'already-big-enough' — картинка уже не меньше целевого размера, а галочка
- *                        велит такие не трогать.
+ * 'same-size'          — попросили ровно тот размер, который уже есть.
  * 'refine-no-op'       — улучшать нечем: выбранная модель не синтезирует
  *                        детали, а резкость выключена. Улучшение качества
  *                        складывается ровно из этих двух вкладов, и без обоих
@@ -49,7 +48,7 @@ export type EnhanceOperation = 'upscale' | 'refine' | 'resize'
  * случае надо поменять модель, во втором модель уже верная и менять надо
  * что-то другое.
  */
-export type NothingToDoReason = 'already-big-enough' | 'refine-no-op' | 'refine-too-large'
+export type NothingToDoReason = 'same-size' | 'refine-no-op' | 'refine-too-large'
 
 /**
  * Работы нет — и это не ошибка.
@@ -61,7 +60,7 @@ export type NothingToDoReason = 'already-big-enough' | 'refine-no-op' | 'refine-
 export class NothingToDoError extends Error {
   constructor(readonly reason: NothingToDoReason) {
     super(
-      reason === 'already-big-enough'
+      reason === 'same-size'
         ? 'Картинка уже нужного размера'
         : 'Улучшать нечем: ни модели, ни резкости',
     )
