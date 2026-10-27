@@ -7,3 +7,4 @@ public/wasm/
 *.log
 .DS_Store
 .vite/
+.claude/
